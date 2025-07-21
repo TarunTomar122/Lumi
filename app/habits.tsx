@@ -250,6 +250,7 @@ export default function Habits() {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      paddingBottom: getResponsiveSize(16),
     },
     habitHeaderActions: {
       flexDirection: 'row',
@@ -287,7 +288,8 @@ export default function Habits() {
       borderColor: colors.border,
     },
     habitHistoryContainer: {
-      marginTop: getResponsiveSize(16),
+      marginTop: getResponsiveSize(0),
+
     },
     addHabitContainer: {
       marginTop: 0,
