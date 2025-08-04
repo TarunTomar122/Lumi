@@ -62,7 +62,7 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
     container: {
       backgroundColor: colors.surface,
       borderRadius: 12,
-      overflow: 'hidden',
+      overflow: 'hidden'
     },
   }));
 
