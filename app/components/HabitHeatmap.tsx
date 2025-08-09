@@ -6,9 +6,12 @@ import { getResponsiveSize } from '@/utils/responsive';
 import type { Habit } from '@/utils/database';
 import { Ionicons } from '@expo/vector-icons';
 
+type HeatmapViewMode = 'stripes' | 'blend' | 'dots' | 'intensity';
+
 interface HabitHeatmapProps {
   habits: Habit[];
   selectedHabits: number[];
+  viewMode?: HeatmapViewMode;
 }
 
 interface DayData {
@@ -23,7 +26,7 @@ type TimePeriod = '7d' | '1m' | '6m';
 
 const HABIT_COLOR = '#FFB3BA'; // The pinkish color used for habits
 
-export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabits }) => {
+export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabits, viewMode = 'stripes' }) => {
   const { colors, createThemedStyles } = useTheme();
   const [selectedPeriod, setSelectedPeriod] = React.useState<TimePeriod>('1m');
   const screenWidth = Dimensions.get('window').width;
@@ -121,6 +124,23 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
     return HABIT_COLOR + hex;
   };
 
+  const hexToRgb = (hex: string) => {
+    const cleaned = hex.replace('#', '');
+    const r = parseInt(cleaned.substring(0, 2), 16);
+    const g = parseInt(cleaned.substring(2, 4), 16);
+    const b = parseInt(cleaned.substring(4, 6), 16);
+    return { r, g, b };
+  };
+
+  const getBlendedRgba = (colorsHex: string[], alpha: number) => {
+    if (colorsHex.length === 0) return `rgba(0,0,0,0)`;
+    const rgbs = colorsHex.map(hexToRgb);
+    const avgR = Math.round(rgbs.reduce((sum, c) => sum + c.r, 0) / rgbs.length);
+    const avgG = Math.round(rgbs.reduce((sum, c) => sum + c.g, 0) / rgbs.length);
+    const avgB = Math.round(rgbs.reduce((sum, c) => sum + c.b, 0) / rgbs.length);
+    return `rgba(${avgR}, ${avgG}, ${avgB}, ${alpha})`;
+  };
+
   const timePeriods = [
     { key: '7d' as TimePeriod, label: '7 Days' },
     { key: '1m' as TimePeriod, label: '1 Month' },
@@ -188,6 +208,29 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
       height: cellSize,
       marginRight: cellGap,
       borderRadius: getResponsiveSize(1),
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    dayCellInnerRow: {
+      flex: 1,
+      flexDirection: 'row',
+      width: '100%',
+      height: '100%',
+      overflow: 'hidden',
+      borderRadius: getResponsiveSize(1),
+    },
+    dayCellDotRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: getResponsiveSize(2),
+      width: '100%',
+      height: '100%',
+    },
+    dayCellDot: {
+      width: Math.max(4, Math.floor(cellSize / 5)),
+      height: Math.max(4, Math.floor(cellSize / 5)),
+      borderRadius: getResponsiveSize(2),
       borderWidth: 1,
       borderColor: colors.border,
     },
@@ -352,26 +395,81 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
           <View style={styles.heatmapGrid}>
             {getHeatmapRows().map((row, rowIndex) => (
               <View key={rowIndex} style={styles.heatmapRow}>
-                {row.map((day, dayIndex) => (
-                  <View
-                    key={`${rowIndex}-${dayIndex}`}
-                    style={[styles.dayCell, { backgroundColor: getIntensityColor(day) }]}
-                  />
-                ))}
+                {row.map((day, dayIndex) => {
+                  const hasCompletions = day.count > 0;
+                  const limitedColors = day.habitColors.slice(0, 4);
+                  if (!hasCompletions) {
+                    return (
+                      <View
+                        key={`${rowIndex}-${dayIndex}`}
+                        style={[styles.dayCell, { backgroundColor: colors.background }]}
+                      />
+                    );
+                  }
+
+                  if (viewMode === 'intensity') {
+                    return (
+                      <View
+                        key={`${rowIndex}-${dayIndex}`}
+                        style={[styles.dayCell, { backgroundColor: getIntensityColor(day) }]}
+                      />
+                    );
+                  }
+
+                  if (viewMode === 'blend') {
+                    const opacity = Math.min(0.4 + day.intensity * 0.8, 1);
+                    const bg = getBlendedRgba(day.habitColors, opacity);
+                    return (
+                      <View
+                        key={`${rowIndex}-${dayIndex}`}
+                        style={[styles.dayCell, { backgroundColor: bg }]}
+                      />
+                    );
+                  }
+
+                  if (viewMode === 'dots') {
+                    return (
+                      <View key={`${rowIndex}-${dayIndex}`} style={[styles.dayCell, { backgroundColor: colors.background }]}> 
+                        <View style={styles.dayCellDotRow}>
+                          {limitedColors.map((c, idx) => (
+                            <View key={idx} style={[styles.dayCellDot, { backgroundColor: c }]} />
+                          ))}
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  // stripes (default)
+                  return (
+                    <View key={`${rowIndex}-${dayIndex}`} style={[styles.dayCell, { backgroundColor: colors.background }]}> 
+                      <View style={styles.dayCellInnerRow}>
+                        {limitedColors.map((c, idx) => (
+                          <View key={idx} style={{ flex: 1, backgroundColor: c }} />
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
 
           {/* Legend */}
-          <View style={styles.legendContainer}>
-            <Text style={styles.legendText}>Less</Text>
-            <View style={[styles.legendCell, { backgroundColor: colors.background }]} />
-            <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + '4D' }]} />
-            <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + '80' }]} />
-            <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + 'B3' }]} />
-            <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR }]} />
-            <Text style={styles.legendText}>More</Text>
-          </View>
+          {viewMode === 'intensity' ? (
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendText}>Less</Text>
+              <View style={[styles.legendCell, { backgroundColor: colors.background }]} />
+              <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + '4D' }]} />
+              <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + '80' }]} />
+              <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR + 'B3' }]} />
+              <View style={[styles.legendCell, { backgroundColor: HABIT_COLOR }]} />
+              <Text style={styles.legendText}>More</Text>
+            </View>
+          ) : (
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendText}>Each color represents a completed habit</Text>
+            </View>
+          )}
         </View>
       </View>
 
