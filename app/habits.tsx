@@ -19,6 +19,7 @@ import React from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from './store/habitStore';
+import { PASTEL_COLORS } from './store/habitStore';
 import { HabitHistory } from './components/HabitHistory';
 import type { Habit } from '@/utils/database';
 import { DateTime } from 'luxon';
@@ -42,8 +43,9 @@ export default function Habits() {
   const [newHabitTitle, setNewHabitTitle] = React.useState('');
   const [editingHabitId, setEditingHabitId] = React.useState<number | null>(null);
   const [editHabitTitle, setEditHabitTitle] = React.useState('');
+  const [colorPickerForHabitId, setColorPickerForHabitId] = React.useState<number | null>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
-  const { habits, updateHabitProgress, refreshHabits, getWeekProgress, addHabit, deleteHabit } =
+  const { habits, updateHabitProgress, refreshHabits, getWeekProgress, addHabit, deleteHabit, updateHabitColor } =
     useHabitStore();
 
   const onRefresh = React.useCallback(async () => {
@@ -368,6 +370,23 @@ export default function Habits() {
     deleteText: {
       color: colors.error || '#FF6B6B',
     },
+    colorPickerContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: getResponsiveSize(8),
+      paddingTop: getResponsiveSize(12),
+    },
+    colorSwatch: {
+      width: getResponsiveSize(28),
+      height: getResponsiveSize(28),
+      borderRadius: getResponsiveSize(14),
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    selectedSwatch: {
+      borderWidth: 2,
+      borderColor: colors.text,
+    },
   }));
 
   return (
@@ -449,10 +468,35 @@ export default function Habits() {
                         <Text style={styles.compactButtonText}>Edit</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
+                        onPress={() => setColorPickerForHabitId(prev => prev === habit.id ? null : habit.id || null)}
+                        style={styles.compactButtonWithDivider}>
+                        <Text style={styles.compactButtonText}>Choose Color</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
                         onPress={() => habit.id && handleDeleteHabit(habit.id, habit.title)}
                         style={styles.compactButton}>
                         <Text style={[styles.compactButtonText, styles.deleteText]}>Delete</Text>
                       </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {colorPickerForHabitId === habit.id && (
+                    <View style={styles.colorPickerContainer}>
+                      {PASTEL_COLORS.map((c) => (
+                        <TouchableOpacity
+                          key={c}
+                          onPress={async () => {
+                            if (!habit.id) return;
+                            await updateHabitColor(habit.id.toString(), c);
+                            setColorPickerForHabitId(null);
+                          }}
+                          style={[
+                            styles.colorSwatch,
+                            { backgroundColor: c },
+                            habit.color === c && styles.selectedSwatch,
+                          ]}
+                        />
+                      ))}
                     </View>
                   )}
                 </View>

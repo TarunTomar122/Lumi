@@ -20,11 +20,21 @@ interface HabitState {
   refreshHabits: () => Promise<void>;
   getWeekProgress: (habit: Habit) => boolean[];
   getMonthData: (habit: Habit, year: number, month: number) => MonthData;
+  updateHabitColor: (id: string, color: string) => Promise<void>;
 }
 
 // Pastel colors for habits
-const PASTEL_COLORS = [
+export const PASTEL_COLORS = [
   '#FFB3BA', // pastel red
+  '#FFDFBA', // pastel orange
+  '#FFFFBA', // pastel yellow
+  '#BAFFC9', // pastel green
+  '#BAE1FF', // pastel blue
+  '#E0BBE4', // pastel purple
+  '#CDE7BE', // pastel mint
+  '#F1C0E8', // pastel pink-purple
+  '#BDE0FE', // pastel sky
+  '#FDE2E4', // pastel blush
 ];
 
 // Get array of ISO date strings for current week (Monday to Sunday)
@@ -71,6 +81,23 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habits: state.habits.map(h =>
           h.id === Number(id)
             ? { ...h, completions: newCompletions }
+            : h
+        ),
+      }));
+    }
+  },
+
+  updateHabitColor: async (id, color) => {
+    const updateResult = await clientTools.updateHabit({
+      id,
+      color,
+    });
+
+    if (updateResult.success) {
+      set((state) => ({
+        habits: state.habits.map(h =>
+          h.id === Number(id)
+            ? { ...h, color }
             : h
         ),
       }));

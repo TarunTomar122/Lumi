@@ -23,6 +23,7 @@ export default function HabitsAnalysis() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [selectedHabits, setSelectedHabits] = React.useState<number[]>([]);
   const { habits, refreshHabits } = useHabitStore();
+  const [viewMode, setViewMode] = React.useState<'stripes' | 'blend' | 'dots' | 'intensity'>('stripes');
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -83,6 +84,32 @@ export default function HabitsAnalysis() {
     },
     habitFilterContainer: {
       marginBottom: getResponsiveSize(24),
+    },
+    viewModeContainer: {
+      marginBottom: getResponsiveSize(16),
+      flexDirection: 'row',
+      backgroundColor: colors.background,
+      borderRadius: getResponsiveSize(6),
+      padding: getResponsiveSize(3),
+    },
+    viewModeButton: {
+      flex: 1,
+      paddingVertical: getResponsiveSize(6),
+      borderRadius: getResponsiveSize(4),
+      alignItems: 'center',
+    },
+    viewModeButtonActive: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    viewModeText: {
+      fontSize: getResponsiveSize(12),
+      fontFamily: 'MonaSans-Medium',
+      color: colors.textSecondary,
+    },
+    viewModeTextActive: {
+      color: colors.text,
     },
     habitFilterTitle: {
       fontSize: getResponsiveSize(18),
@@ -150,7 +177,35 @@ export default function HabitsAnalysis() {
         <View style={styles.content}>
           {/* Heatmap */}
           <View style={styles.heatmapContainer}>
-            <HabitHeatmap habits={habits} selectedHabits={selectedHabits} />
+            {/* View mode selector */}
+            <View style={styles.viewModeContainer}>
+              {[
+                { key: 'stripes', label: 'Stripes' },
+                { key: 'blend', label: 'Blend' },
+                { key: 'dots', label: 'Dots' },
+                { key: 'intensity', label: 'Intensity' },
+              ].map((m) => (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[
+                    styles.viewModeButton,
+                    viewMode === m.key && styles.viewModeButtonActive,
+                  ]}
+                  onPress={() => setViewMode(m.key as any)}
+                >
+                  <Text
+                    style={[
+                      styles.viewModeText,
+                      viewMode === m.key && styles.viewModeTextActive,
+                    ]}
+                  >
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <HabitHeatmap habits={habits} selectedHabits={selectedHabits} viewMode={viewMode} />
           </View>
         </View>
       </ScrollView>
