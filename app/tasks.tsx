@@ -3,15 +3,17 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView, 
+  ScrollView,
   SafeAreaView,
   RefreshControl,
   StatusBar,
   Dimensions,
   TextInput,
+  Platform,
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,16 +35,16 @@ import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
 import InputContainer from './components/inputContainer';
 
-const SwipeableTaskItem = ({ 
-  task, 
-  onToggle, 
-  onDelete, 
-  onUpdate, 
-  isDemo = false, 
-  onDemoComplete, 
-  isEditing, 
-  onEditStart, 
-  onEditEnd 
+const SwipeableTaskItem = ({
+  task,
+  onToggle,
+  onDelete,
+  onUpdate,
+  isDemo = false,
+  onDemoComplete,
+  isEditing,
+  onEditStart,
+  onEditEnd,
 }: any) => {
   const { colors } = useTheme();
   const translateX = useSharedValue(0);
@@ -306,16 +308,20 @@ const SwipeableTaskItem = ({
 export default function Tasks() {
   const router = useRouter();
   const { colors, createThemedStyles } = useTheme();
+  const insets = useSafeAreaInsets();
   const [userResponse, setUserResponse] = React.useState('');
   const [isRecording, setIsRecording] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
-  const { tasks, updateTask, refreshTasks, deleteTask, addTask, error, clearError } = useTaskStore();
+  const { tasks, updateTask, refreshTasks, deleteTask, addTask, error, clearError } =
+    useTaskStore();
   const [activeContent, setActiveContent] = React.useState<string>('home');
   const [showDemo, setShowDemo] = React.useState(false);
   const [demoCount, setDemoCount] = React.useState(0);
   const [groupedTasks, setGroupedTasks] = React.useState<{ [key: string]: typeof tasks }>({});
   const [shouldRegroup, setShouldRegroup] = React.useState(true);
   const [editingTaskId, setEditingTaskId] = React.useState<number | null>(null);
+  const [keyboardOffset, setKeyboardOffset] = React.useState(0);
+  const [inputBarHeight, setInputBarHeight] = React.useState(0);
 
   React.useEffect(() => {
     refreshTasks();
@@ -400,6 +406,26 @@ export default function Tasks() {
       return () => clearTimeout(timer);
     }
   }, [tasks.length, demoCount, showDemo]);
+
+  // Adjust input bar position with keyboard
+  React.useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) => {
+      const height = e?.endCoordinates?.height || 0;
+      setKeyboardOffset(height);
+    };
+    const onHide = () => setKeyboardOffset(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -527,6 +553,9 @@ export default function Tasks() {
     taskList: {
       flex: 1,
       paddingRight: getResponsiveSize(8),
+    },
+    taskListContent: {
+      paddingBottom: getResponsiveSize(84),
     },
     taskItem: {
       flexDirection: 'row',
@@ -681,6 +710,16 @@ export default function Tasks() {
       color: colors.textSecondary,
       textAlign: 'center',
     },
+    inputBarContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: getResponsiveSize(24),
+      paddingTop: getResponsiveSize(8),
+      marginBottom: getResponsiveSize(16),
+      backgroundColor: colors.background,
+    },
   }));
 
   const handleOutsidePress = () => {
@@ -692,9 +731,7 @@ export default function Tasks() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <TouchableWithoutFeedback 
-        onPress={handleOutsidePress}
-        disabled={editingTaskId === null}>
+      <TouchableWithoutFeedback onPress={handleOutsidePress} disabled={editingTaskId === null}>
         <SafeAreaView style={styles.safeArea}>
           <StatusBar barStyle={colors.statusBarStyle} />
           <View style={styles.header}>
@@ -702,157 +739,175 @@ export default function Tasks() {
               <Ionicons name="arrow-back" size={getResponsiveSize(28)} color={colors.text} />
               <Text style={styles.backText}>Tasks</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/task-history')} style={styles.historyButton}>
+            <TouchableOpacity
+              onPress={() => router.push('/task-history')}
+              style={styles.historyButton}>
               <Ionicons name="analytics-outline" size={getResponsiveSize(24)} color={colors.text} />
             </TouchableOpacity>
           </View>
           {activeContent === 'home' && (
-          <View style={styles.container}>
-                         {error && (
-               <View style={styles.errorContainer}>
-                 <Text style={styles.errorText}>{error}</Text>
-                 <TouchableOpacity style={styles.errorButton} onPress={() => clearError()}>
-                   <Text style={styles.errorButtonText}>Dismiss</Text>
-                 </TouchableOpacity>
-               </View>
-             )}
-            {tasks.length === 0 && (
-              <View style={styles.noTasksContainer}>
-                <View style={styles.emptyStateCard}>
-                  <Text style={styles.emptyStateTitle}>Lumi can understand natural language</Text>
+            <View style={styles.container}>
+              {error && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                  <TouchableOpacity style={styles.errorButton} onPress={() => clearError()}>
+                    <Text style={styles.errorButtonText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {tasks.length === 0 && (
+                <View style={styles.noTasksContainer}>
+                  <View style={styles.emptyStateCard}>
+                    <Text style={styles.emptyStateTitle}>Lumi can understand natural language</Text>
 
-                  <View style={styles.examplesContainer}>
-                    <View style={styles.exampleItem}>
-                      <Text style={styles.exampleText}>"call mom at 7pm"</Text>
-                      <Text style={styles.exampleDescription}>Set a specific time</Text>
-                    </View>
+                    <View style={styles.examplesContainer}>
+                      <View style={styles.exampleItem}>
+                        <Text style={styles.exampleText}>"call mom at 7pm"</Text>
+                        <Text style={styles.exampleDescription}>Set a specific time</Text>
+                      </View>
 
-                    <View style={styles.exampleItem}>
-                      <Text style={styles.exampleText}>"gym session tomorrow"</Text>
-                      <Text style={styles.exampleDescription}>Schedule for tomorrow</Text>
-                    </View>
+                      <View style={styles.exampleItem}>
+                        <Text style={styles.exampleText}>"gym session tomorrow"</Text>
+                        <Text style={styles.exampleDescription}>Schedule for tomorrow</Text>
+                      </View>
 
-                    <View style={styles.exampleItem}>
-                      <Text style={styles.exampleText}>"doctor appointment friday at 2pm"</Text>
-                      <Text style={styles.exampleDescription}>Set day and time</Text>
-                    </View>
+                      <View style={styles.exampleItem}>
+                        <Text style={styles.exampleText}>"doctor appointment friday at 2pm"</Text>
+                        <Text style={styles.exampleDescription}>Set day and time</Text>
+                      </View>
 
-                    <View style={styles.exampleItem}>
-                      <Text style={styles.exampleText}>"buy groceries"</Text>
-                      <Text style={styles.exampleDescription}>No time needed</Text>
+                      <View style={styles.exampleItem}>
+                        <Text style={styles.exampleText}>"buy groceries"</Text>
+                        <Text style={styles.exampleDescription}>No time needed</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-            )}
-            <ScrollView
-              style={styles.taskList}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={colors.text}
-                />
-              }>
-              {(() => {
-                // Use the grouped tasks from state
-                const today = DateTime.now().setZone('Asia/Kolkata').startOf('day');
+              )}
+               <ScrollView
+                style={styles.taskList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
+                 contentContainerStyle={[
+                   styles.taskListContent,
+                   { paddingBottom: inputBarHeight + insets.bottom },
+                 ]}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={colors.text}
+                  />
+                }>
+                {(() => {
+                  // Use the grouped tasks from state
+                  const today = DateTime.now().setZone('Asia/Kolkata').startOf('day');
 
-                // Create a map of section keys to their actual dates for proper sorting
-                const sectionDates: { [key: string]: DateTime | null } = {};
+                  // Create a map of section keys to their actual dates for proper sorting
+                  const sectionDates: { [key: string]: DateTime | null } = {};
 
-                Object.keys(groupedTasks).forEach(sectionKey => {
-                  if (sectionKey === 'Overdue') {
-                    sectionDates[sectionKey] = today.minus({ days: 1000 }); // Will be sorted first
-                  } else if (sectionKey === 'Today') {
-                    sectionDates[sectionKey] = today;
-                  } else if (sectionKey === 'Tomorrow') {
-                    sectionDates[sectionKey] = today.plus({ days: 1 });
-                  } else if (sectionKey === 'No Date') {
-                    sectionDates[sectionKey] = null; // Will be sorted last
-                  } else {
-                    // For day names and specific dates, find the actual date from the first task in that group
-                    const firstTask = groupedTasks[sectionKey]?.[0];
-                    if (firstTask) {
-                      const taskDateStr = firstTask.due_date || firstTask.reminder_date;
-                      if (taskDateStr) {
-                        sectionDates[sectionKey] = DateTime.fromISO(taskDateStr)
-                          .setZone('Asia/Kolkata')
-                          .startOf('day');
-                      } else {
-                        sectionDates[sectionKey] = null;
+                  Object.keys(groupedTasks).forEach(sectionKey => {
+                    if (sectionKey === 'Overdue') {
+                      sectionDates[sectionKey] = today.minus({ days: 1000 }); // Will be sorted first
+                    } else if (sectionKey === 'Today') {
+                      sectionDates[sectionKey] = today;
+                    } else if (sectionKey === 'Tomorrow') {
+                      sectionDates[sectionKey] = today.plus({ days: 1 });
+                    } else if (sectionKey === 'No Date') {
+                      sectionDates[sectionKey] = null; // Will be sorted last
+                    } else {
+                      // For day names and specific dates, find the actual date from the first task in that group
+                      const firstTask = groupedTasks[sectionKey]?.[0];
+                      if (firstTask) {
+                        const taskDateStr = firstTask.due_date || firstTask.reminder_date;
+                        if (taskDateStr) {
+                          sectionDates[sectionKey] = DateTime.fromISO(taskDateStr)
+                            .setZone('Asia/Kolkata')
+                            .startOf('day');
+                        } else {
+                          sectionDates[sectionKey] = null;
+                        }
                       }
                     }
-                  }
-                });
+                  });
 
-                const sortedSections = Object.keys(groupedTasks).sort((a, b) => {
-                  const dateA = sectionDates[a];
-                  const dateB = sectionDates[b];
+                  const sortedSections = Object.keys(groupedTasks).sort((a, b) => {
+                    const dateA = sectionDates[a];
+                    const dateB = sectionDates[b];
 
-                  // No Date sections go to the end
-                  if (!dateA && !dateB) return 0;
-                  if (!dateA) return 1;
-                  if (!dateB) return -1;
+                    // No Date sections go to the end
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
 
-                  // Sort by actual date
-                  return dateA.toMillis() - dateB.toMillis();
-                });
+                    // Sort by actual date
+                    return dateA.toMillis() - dateB.toMillis();
+                  });
 
-                return sortedSections.map((sectionKey, sectionIndex) => (
-                  <View key={sectionKey}>
-                    {groupedTasks[sectionKey].length > 0 && (
-                      <>
-                        <Text
-                          style={[
-                            styles.sectionHeader,
-                            sectionIndex === 0 && styles.firstSectionHeader,
-                          ]}>
-                          {sectionKey}
-                        </Text>
-                        {groupedTasks[sectionKey].map((cachedTask, index) => {
-                          // Get current task data from store for real-time status updates
-                          const currentTask = tasks.find(t => t.id === cachedTask.id) || cachedTask;
-                          return (
-                            <SwipeableTaskItem
-                              key={`${cachedTask.id}-${sectionKey}-${index}`}
-                              task={currentTask}
-                              onToggle={handleTaskToggle}
-                              onDelete={handleTaskDelete}
-                              onUpdate={handleTaskUpdate}
-                              isEditing={editingTaskId === currentTask.id}
-                              onEditStart={handleEditStart}
-                              onEditEnd={handleEditEnd}
-                              isDemo={showDemo && sectionIndex === 0 && index === 0}
-                              onDemoComplete={() => {
-                                setShowDemo(false);
-                                incrementDemoCount();
-                              }}
-                            />
-                          );
-                        })}
-                      </>
-                    )}
-                  </View>
-                ));
-              })()}
-            </ScrollView>
+                  return sortedSections.map((sectionKey, sectionIndex) => (
+                    <View key={sectionKey}>
+                      {groupedTasks[sectionKey].length > 0 && (
+                        <>
+                          <Text
+                            style={[
+                              styles.sectionHeader,
+                              sectionIndex === 0 && styles.firstSectionHeader,
+                            ]}>
+                            {sectionKey}
+                          </Text>
+                          {groupedTasks[sectionKey].map((cachedTask, index) => {
+                            // Get current task data from store for real-time status updates
+                            const currentTask =
+                              tasks.find(t => t.id === cachedTask.id) || cachedTask;
+                            return (
+                              <SwipeableTaskItem
+                                key={`${cachedTask.id}-${sectionKey}-${index}`}
+                                task={currentTask}
+                                onToggle={handleTaskToggle}
+                                onDelete={handleTaskDelete}
+                                onUpdate={handleTaskUpdate}
+                                isEditing={editingTaskId === currentTask.id}
+                                onEditStart={handleEditStart}
+                                onEditEnd={handleEditEnd}
+                                isDemo={showDemo && sectionIndex === 0 && index === 0}
+                                onDemoComplete={() => {
+                                  setShowDemo(false);
+                                  incrementDemoCount();
+                                }}
+                              />
+                            );
+                          })}
+                        </>
+                      )}
+                    </View>
+                  ));
+                })()}
+               </ScrollView>
 
-            {/* Only show InputContainer when not editing any task */}
-            {editingTaskId === null && (
-              <InputContainer
-                userResponse={userResponse}
-                setUserResponse={setUserResponse}
-                handleSubmit={handleSubmit}
-                isRecording={isRecording}
-                setIsRecording={setIsRecording}
-                onlyRecording={false}
-                placeholder="Call mom at 9pm"
-              />
-            )}
-          </View>
-        )}
+              {/* Only show InputContainer when not editing any task */}
+               {editingTaskId === null && (
+                 <View
+                   onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
+                   style={[
+                     styles.inputBarContainer,
+                     { paddingBottom: insets.bottom, bottom: keyboardOffset },
+                   ]}
+                 >
+                   <InputContainer
+                     userResponse={userResponse}
+                     setUserResponse={setUserResponse}
+                     handleSubmit={handleSubmit}
+                     isRecording={isRecording}
+                     setIsRecording={setIsRecording}
+                     onlyRecording={false}
+                     placeholder="Call mom at 9pm"
+                     containerStyle={{ marginBottom: 0 }}
+                   />
+                 </View>
+               )}
+            </View>
+          )}
         </SafeAreaView>
       </TouchableWithoutFeedback>
     </GestureHandlerRootView>

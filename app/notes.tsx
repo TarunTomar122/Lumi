@@ -6,6 +6,8 @@ import {
   SafeAreaView,
   RefreshControl,
   StatusBar,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,10 +17,12 @@ import InputContainer from './components/inputContainer';
 import { clientTools } from '@/utils/tools';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Notes() {
   const router = useRouter();
   const { colors, createThemedStyles } = useTheme();
+  const insets = useSafeAreaInsets();
   const [userResponse, setUserResponse] = React.useState('');
   const [isRecording, setIsRecording] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -26,6 +30,8 @@ export default function Notes() {
   const { tag } = useLocalSearchParams();
   const [filteredMemories, setFilteredMemories] = React.useState(memories);
   const [uniqueTags, setUniqueTags] = React.useState<string[]>([]);
+  const [keyboardOffset, setKeyboardOffset] = React.useState(0);
+  const [inputBarHeight, setInputBarHeight] = React.useState(0);
 
   React.useEffect(() => {
     const tags = memories.map(memory => memory.tags).flat();
@@ -45,6 +51,25 @@ export default function Notes() {
     } else {
       setFilteredMemories(memories);
     }
+  }, []);
+
+  React.useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) => {
+      const height = e?.endCoordinates?.height || 0;
+      setKeyboardOffset(height);
+    };
+    const onHide = () => setKeyboardOffset(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
   }, []);
 
   const onRefresh = React.useCallback(async () => {
@@ -156,6 +181,9 @@ export default function Notes() {
     notesList: {
       flex: 1,
     },
+    notesListContent: {
+      paddingBottom: 0,
+    },
     noteItem: {
       paddingVertical: getResponsiveSize(16),
       borderBottomWidth: 1,
@@ -243,6 +271,16 @@ export default function Notes() {
       color: colors.textSecondary,
       lineHeight: getResponsiveSize(20),
     },
+    inputBarContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: getResponsiveSize(24),
+      paddingTop: getResponsiveSize(8),
+      marginBottom: getResponsiveSize(16),
+      backgroundColor: colors.background,
+    },
   }));
 
   return (
@@ -297,6 +335,10 @@ export default function Notes() {
         <ScrollView
           style={styles.notesList}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.notesListContent,
+            { paddingBottom: inputBarHeight + insets.bottom },
+          ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />
           }>
@@ -317,15 +359,24 @@ export default function Notes() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <InputContainer
-          userResponse={userResponse}
-          setUserResponse={setUserResponse}
-          handleSubmit={handleSubmit}
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
-          onlyRecording={false}
-          placeholder="Work: This is a work note"
-        />
+        <View
+          onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
+          style={[
+            styles.inputBarContainer,
+            { paddingBottom: insets.bottom, bottom: keyboardOffset },
+          ]}
+        >
+          <InputContainer
+            userResponse={userResponse}
+            setUserResponse={setUserResponse}
+            handleSubmit={handleSubmit}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            onlyRecording={false}
+            placeholder="Work: This is a work note"
+            containerStyle={{ marginBottom: 0 }}
+          />
+        </View>
       </View>
     </SafeAreaView>
   );

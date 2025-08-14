@@ -1,4 +1,5 @@
 import { TextInput, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import React from 'react';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ export default function InputContainer({
   setIsRecording,
   onlyRecording,
   placeholder,
+  containerStyle,
 }: {
   userResponse: string;
   setUserResponse: (text: string) => void;
@@ -22,6 +24,7 @@ export default function InputContainer({
   setIsRecording: (recording: boolean) => void;
   onlyRecording?: boolean;
   placeholder?: string;
+  containerStyle?: StyleProp<ViewStyle>;
 }) {
   const { colors, createThemedStyles } = useTheme();
   const processedResultsRef = React.useRef<Set<string>>(new Set());
@@ -109,7 +112,7 @@ export default function InputContainer({
   }
 
   return (
-    <View style={[styles.inputContainer]}>
+    <View style={[styles.inputContainer, containerStyle]}>
       <TextInput
         style={styles.textInput}
         placeholder={isRecording ? 'Listening...' : placeholder || 'Ask anything'}
