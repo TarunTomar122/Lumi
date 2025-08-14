@@ -6,6 +6,8 @@ import {
   SafeAreaView,
   RefreshControl,
   StatusBar,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import React from 'react';
 import { useRouter } from 'expo-router';
@@ -16,15 +18,19 @@ import InputContainer from './components/inputContainer';
 import { ReflectionPrompt } from './components/ReflectionPrompt';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Reflections() {
   const router = useRouter();
   const { colors, createThemedStyles } = useTheme();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = React.useState(false);
   const [userResponse, setUserResponse] = React.useState('');
   const [selectedPrompt, setSelectedPrompt] = React.useState<string | undefined>();
   const [isRecording, setIsRecording] = React.useState(false);
   const { reflections, refreshReflections, addReflection } = useReflectionStore();
+  const [keyboardOffset, setKeyboardOffset] = React.useState(0);
+  const [inputBarHeight, setInputBarHeight] = React.useState(0);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -34,6 +40,25 @@ export default function Reflections() {
       console.error('Error refreshing reflections:', error);
     }
     setRefreshing(false);
+  }, []);
+
+  React.useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) => {
+      const height = e?.endCoordinates?.height || 0;
+      setKeyboardOffset(height);
+    };
+    const onHide = () => setKeyboardOffset(0);
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
   }, []);
 
   React.useEffect(() => {
@@ -159,6 +184,9 @@ export default function Reflections() {
       flex: 1,
       marginTop: getResponsiveHeight(12),
     },
+    reflectionsListContent: {
+      paddingBottom: 0,
+    },
     reflectionItem: {
       marginBottom: getResponsiveHeight(16),
       paddingVertical: getResponsiveHeight(6),
@@ -200,6 +228,10 @@ export default function Reflections() {
         <ScrollView
           style={styles.reflectionsList}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.reflectionsListContent,
+            { paddingBottom: inputBarHeight + insets.bottom },
+          ]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />
           }>
@@ -218,14 +250,29 @@ export default function Reflections() {
             );
           })}
         </ScrollView>
-        <InputContainer
-          userResponse={userResponse}
-          setUserResponse={setUserResponse}
-          handleSubmit={handleSubmit}
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
-          placeholder="Today was a good day"
-        />
+        <View
+          onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: keyboardOffset,
+            paddingHorizontal: getResponsiveSize(24),
+            paddingTop: getResponsiveSize(8),
+            marginBottom: getResponsiveSize(16),
+            backgroundColor: colors.background,
+          }}
+        >
+          <InputContainer
+            userResponse={userResponse}
+            setUserResponse={setUserResponse}
+            handleSubmit={handleSubmit}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            placeholder="Today was a good day"
+            containerStyle={{ marginBottom: insets.bottom }}
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
