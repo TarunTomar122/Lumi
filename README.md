@@ -48,26 +48,6 @@ All data is stored **locally on your device**, giving you complete control and p
   </tr>
 </table>
 
-
----
-
-## 🔮 What's Next?
-
-Here’s what we’re planning to add in the near future:
-
-- [x] Ability to **delete habits/tasks** to keep your tracker clean
-- [x] Tag management: Add tags to **untagged notes** for better organization
-- [x] Gentle **reminders** to fill in your daily reflection
-- [ ] Ability to add images to notes
-- [ ] Export a **shareable image of your monthly habit streaks**
-- [ ] **Export your notes and reflections** to a Google Doc or `.txt` file
-- [ ] **Speech-to-text notes** for quick voice capture
-- [ ] **Background nudges**: smart prompts based on your patterns (using background fetch)
-- [x] Light **task management analytics** to help you reflect on your habits and productivity
-
-> Have ideas or feature requests? [Open an issue](https://github.com/TarunTomar122/lumi/issues) or reach out!
-
-
 ---
 
 ## 🛠️ Built With
@@ -78,14 +58,20 @@ Here’s what we’re planning to add in the near future:
 
 ---
 
-## 💬 Community
+## 🤝 Contributing
 
-Want to share feedback or ideas?
-→ DM [@tarat.hobbies](https://www.instagram.com/tarat.hobbies/) or file an issue here on GitHub.
+We welcome contributions to Lumi! If you're interested in helping out, please check out our [Contributing Guide](CONTRIBUTING.md) for more information on how to get started.
+
+Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
+
+### Hacktoberfest
+
+[![Hacktoberfest](https://img.shields.io/badge/Hacktoberfest-2025-orange.svg)](https://hacktoberfest.com/)
+
+We are participating in Hacktoberfest! We welcome all contributors, new and experienced. Look for issues with the `hacktoberfest` label to get started.
 
 ---
 
 Coming soon on iOS. For now, Android only.
-
 
 ---
