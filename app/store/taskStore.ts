@@ -61,6 +61,7 @@ export const useTaskStore = create<TaskState>(set => ({
   },
 
   refreshTasks: async () => {
+    console.log('refreshing tasks');
     const result = await clientTools.getAllTasks();
     // sort the tasks by due date (earliest first), then by creation date
     const sortedTasks = result.tasks?.sort((a, b) => {

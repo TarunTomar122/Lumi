@@ -23,7 +23,7 @@ export default function HabitsAnalysis() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [selectedHabits, setSelectedHabits] = React.useState<number[]>([]);
   const { habits, refreshHabits } = useHabitStore();
-  const [viewMode, setViewMode] = React.useState<'stripes' | 'blend' | 'dots' | 'intensity'>('stripes');
+  const [viewMode, setViewMode] = React.useState<'stripes' | 'blend' | 'dots' | 'intensity'>('blend');
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -51,6 +51,7 @@ export default function HabitsAnalysis() {
       flex: 1,
       backgroundColor: colors.background,
       paddingTop: getResponsiveHeight(28),
+      marginBottom: getResponsiveHeight(28),
     },
     header: {
       flexDirection: 'row',
@@ -88,28 +89,28 @@ export default function HabitsAnalysis() {
     viewModeContainer: {
       marginBottom: getResponsiveSize(16),
       flexDirection: 'row',
-      backgroundColor: colors.background,
-      borderRadius: getResponsiveSize(6),
-      padding: getResponsiveSize(3),
-    },
-    viewModeButton: {
-      flex: 1,
-      paddingVertical: getResponsiveSize(6),
-      borderRadius: getResponsiveSize(4),
-      alignItems: 'center',
-    },
-    viewModeButtonActive: {
       backgroundColor: colors.card,
+      borderRadius: getResponsiveSize(8),
+      padding: getResponsiveSize(4),
       borderWidth: 1,
       borderColor: colors.border,
     },
+    viewModeButton: {
+      flex: 1,
+      paddingVertical: getResponsiveSize(10),
+      borderRadius: getResponsiveSize(6),
+      alignItems: 'center',
+    },
+    viewModeButtonActive: {
+      backgroundColor: colors.primary,
+    },
     viewModeText: {
-      fontSize: getResponsiveSize(12),
+      fontSize: getResponsiveSize(14),
       fontFamily: 'MonaSans-Medium',
       color: colors.textSecondary,
     },
     viewModeTextActive: {
-      color: colors.text,
+      color: colors.background,
     },
     habitFilterTitle: {
       fontSize: getResponsiveSize(18),
@@ -180,9 +181,9 @@ export default function HabitsAnalysis() {
             {/* View mode selector */}
             <View style={styles.viewModeContainer}>
               {[
-                { key: 'stripes', label: 'Stripes' },
                 { key: 'blend', label: 'Blend' },
                 { key: 'dots', label: 'Dots' },
+                { key: 'stripes', label: 'Stripes' },
                 { key: 'intensity', label: 'Intensity' },
               ].map((m) => (
                 <TouchableOpacity

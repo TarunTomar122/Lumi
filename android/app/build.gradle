@@ -96,6 +96,11 @@ Project background_fetch = project(':react-native-background-fetch')
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 19
         versionName "1.7"
+        
+        // Support for 16 KB page sizes (required by Google Play as of Nov 2025)
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
     }
     signingConfigs {
         debug {

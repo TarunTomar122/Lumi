@@ -203,9 +203,16 @@ const clientToolsSchema = [
         id: { type: 'string', description: 'ID of the habit to update' },
         title: { type: 'string', description: 'New title for the habit' },
         color: { type: 'string', description: 'New hex color code for the habit' },
+        archived: { type: 'boolean', description: 'Whether the habit is archived' },
+        position: { type: 'number', description: 'Position/order of the habit' },
       },
       required: ['id'],
     },
+  },
+  {
+    type: 'function',
+    name: 'getArchivedHabits',
+    description: 'Gets all archived habits.',
   },
   {
     type: 'function',
@@ -553,17 +560,23 @@ const clientTools = {
     title,
     color,
     completions,
+    archived,
+    position,
   }: {
     id: string;
     title?: string;
     color?: string;
     completions?: Record<string, boolean>;
+    archived?: boolean;
+    position?: number;
   }) => {
     try {
       await db.updateHabit(Number(id), {
-        ...(title && { title }),
-        ...(color && { color }),
-        ...(completions && { completions }),
+        ...(title !== undefined && { title }),
+        ...(color !== undefined && { color }),
+        ...(completions !== undefined && { completions }),
+        ...(archived !== undefined && { archived }),
+        ...(position !== undefined && { position }),
       });
       return { success: true };
     } catch (error) {
@@ -579,6 +592,16 @@ const clientTools = {
     } catch (error) {
       console.error('Error fetching habits:', error);
       return { success: false, error: 'Failed to fetch habits.' };
+    }
+  },
+
+  getArchivedHabits: async () => {
+    try {
+      const habits = await db.getArchivedHabits();
+      return { success: true, habits };
+    } catch (error) {
+      console.error('Error fetching archived habits:', error);
+      return { success: false, error: 'Failed to fetch archived habits.' };
     }
   },
 

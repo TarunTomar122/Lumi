@@ -340,9 +340,9 @@ export default function SettingsPage() {
             )}
           </View>
         </View>
-
+  
         {/* Local Model Section */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>Local Model</Text>
           <View style={styles.settingItem}>
             <View style={styles.rowBetween}>
@@ -433,7 +433,7 @@ export default function SettingsPage() {
               </View>
             </View>
           )}
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );
