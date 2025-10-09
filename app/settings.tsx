@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import {
   Text,
   View,
@@ -16,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useUserStore } from './store/userStore';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
+import { downloadLumiModel, getLocalModelStatus, deleteLocalModel } from '../utils/localModel';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -24,6 +26,9 @@ export default function SettingsPage() {
   const [newUsername, setNewUsername] = useState(username);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [supportExpanded, setSupportExpanded] = useState(false);
+  const [modelHasFile, setModelHasFile] = useState<boolean>(false);
+  const [downloading, setDownloading] = useState<boolean>(false);
+  const [downloadPct, setDownloadPct] = useState<number | null>(null);
 
   const handleUsernameUpdate = async () => {
     if (newUsername.trim() === '') {
@@ -183,7 +188,27 @@ export default function SettingsPage() {
       fontFamily: 'MonaSans-Medium',
       color: colors.primaryText,
     },
+    rowBetween: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    smallNote: {
+      fontSize: getResponsiveSize(13),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.textSecondary,
+      marginTop: getResponsiveHeight(8),
+    },
   }));
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const status = await getLocalModelStatus();
+        setModelHasFile(!!status.hasModel);
+      } catch {}
+    })();
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -314,6 +339,100 @@ export default function SettingsPage() {
               </View>
             )}
           </View>
+        </View>
+
+        {/* Local Model Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Local Model</Text>
+          <View style={styles.settingItem}>
+            <View style={styles.rowBetween}>
+              <View style={styles.settingLeft}>
+                <Ionicons 
+                  name="download-outline" 
+                  size={getResponsiveSize(20)} 
+                  color={colors.text} 
+                />
+                <Text style={styles.settingText}>
+                  {modelHasFile ? 'Model downloaded' : 'Download Lumi model'}{downloading && typeof downloadPct === 'number' ? ` (${downloadPct}%)` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                disabled={downloading}
+                onPress={async () => {
+                  try {
+                    setDownloading(true);
+                    setDownloadPct(0);
+                    const status = await downloadLumiModel((p) => setDownloadPct(p.pct));
+                    setModelHasFile(!!status.hasModel);
+                    Alert.alert('Success', 'Model downloaded.');
+                  } catch (e) {
+                    Alert.alert('Error', 'Failed to download model.');
+                  } finally {
+                    setDownloading(false);
+                    setDownloadPct(null);
+                  }
+                }}
+              >
+                <Text style={[styles.actionButtonText, downloading && { opacity: 0.6 }]}>
+                  {downloading ? 'Downloading...' : (modelHasFile ? 'Redownload' : 'Download')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.smallNote}>
+              Runs fully on-device using llama.rn. Internet is only used to download the GGUF file.
+            </Text>
+          </View>
+
+          <View style={styles.settingItem}>
+            <View style={styles.rowBetween}>
+              <View style={styles.settingLeft}>
+                <Ionicons 
+                  name="chatbubbles-outline" 
+                  size={getResponsiveSize(20)} 
+                  color={colors.text} 
+                />
+                <Text style={styles.settingText}>Open Local Chat</Text>
+              </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  const status = await getLocalModelStatus();
+                  if (!status.hasModel) {
+                    Alert.alert('Model missing', 'Please download the model first.');
+                    return;
+                  }
+                  router.push('/local-chat');
+                }}
+              >
+                <Ionicons name="chevron-forward" size={getResponsiveSize(20)} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {modelHasFile && (
+            <View style={styles.settingItem}>
+              <View style={styles.rowBetween}>
+                <View style={styles.settingLeft}>
+                  <Ionicons 
+                    name="trash-outline" 
+                    size={getResponsiveSize(20)} 
+                    color={colors.text} 
+                  />
+                  <Text style={styles.settingText}>Delete Local Model</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      await deleteLocalModel();
+                      const s = await getLocalModelStatus();
+                      setModelHasFile(!!s.hasModel);
+                    } catch {}
+                  }}
+                >
+                  <Ionicons name="trash" size={getResponsiveSize(18)} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
