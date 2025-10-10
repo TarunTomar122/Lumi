@@ -15,6 +15,7 @@ export default function InputContainer({
   onlyRecording,
   placeholder,
   containerStyle,
+  onAddImagePress,
 }: {
   userResponse: string;
   setUserResponse: (text: string) => void;
@@ -25,6 +26,7 @@ export default function InputContainer({
   onlyRecording?: boolean;
   placeholder?: string;
   containerStyle?: StyleProp<ViewStyle>;
+  onAddImagePress?: () => void;
 }) {
   const { colors, createThemedStyles } = useTheme();
   const processedResultsRef = React.useRef<Set<string>>(new Set());
@@ -122,6 +124,15 @@ export default function InputContainer({
         multiline={true}
         numberOfLines={4}
       />
+      
+      <TouchableOpacity
+        style={{ paddingHorizontal: 8 }}
+        onPress={() => {
+          onAddImagePress?.();
+        }}
+      >
+        <Ionicons name="image-outline" size={22} color={colors.text} />
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.micButton, { marginLeft: 8 }]}
