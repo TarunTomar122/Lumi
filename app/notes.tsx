@@ -8,6 +8,8 @@ import {
   StatusBar,
   Platform,
   Keyboard,
+  Image,
+  Alert,
 } from 'react-native';
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,6 +20,8 @@ import { clientTools } from '@/utils/tools';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function Notes() {
   const router = useRouter();
@@ -32,6 +36,7 @@ export default function Notes() {
   const [uniqueTags, setUniqueTags] = React.useState<string[]>([]);
   const [keyboardOffset, setKeyboardOffset] = React.useState(0);
   const [inputBarHeight, setInputBarHeight] = React.useState(0);
+  const [selectedImages, setSelectedImages] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     const tags = memories.map(memory => memory.tags).flat();
@@ -105,8 +110,51 @@ export default function Notes() {
       title,
       content: noteContent,
       tags: [selectedTag],
+      images: selectedImages,
     });
+    setUserResponse('');
+    setSelectedImages([]);
     refreshMemories();
+  };
+
+    const handleAddImagePress = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow access to your photos to attach images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+
+      if (result.canceled || (result as any).cancelled) {
+        return;
+      }
+
+      const asset = (result as any).assets ? (result as any).assets[0] : result as any;
+      const localUri = asset.uri;
+
+      if (!localUri) return;
+
+      const imagesDir = FileSystem.documentDirectory + 'images/';
+      await FileSystem.makeDirectoryAsync(imagesDir, { intermediates: true }).catch(() => {});
+      const namePart = localUri.split('/').pop();
+      const dest = imagesDir + `${Date.now()}_${namePart}`;
+
+      await FileSystem.copyAsync({ from: localUri, to: dest });
+
+      setSelectedImages(prev => [...prev, dest]);
+    } catch (error) {
+      console.error('Error picking/copying image:', error);
+      Alert.alert('Error', 'Could not attach image.');
+    }
+  };
+
+  const removeSelectedImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const styles = createThemedStyles(colors => ({
@@ -200,6 +248,32 @@ export default function Notes() {
       fontSize: getResponsiveSize(14),
       fontFamily: 'MonaSans-Regular',
       color: colors.textSecondary,
+    },
+      noteThumbnail: {
+      width: getResponsiveSize(72),
+      height: getResponsiveSize(72),
+      borderRadius: getResponsiveSize(8),
+      marginBottom: getResponsiveSize(8),
+      marginTop: getResponsiveSize(8),
+    },
+    imagesPreviewRow: {
+      flexDirection: 'row',
+      gap: getResponsiveSize(8),
+      marginBottom: getResponsiveSize(8),
+    },
+    imagePreviewContainer: {
+      width: getResponsiveSize(72),
+      height: getResponsiveSize(72),
+      borderRadius: getResponsiveSize(8),
+      overflow: 'hidden',
+      marginRight: getResponsiveSize(8),
+      position: 'relative',
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      zIndex: 2,
     },
     emptyStateCard: {
       backgroundColor: colors.card,
@@ -366,6 +440,22 @@ export default function Notes() {
             { paddingBottom: insets.bottom, bottom: keyboardOffset },
           ]}
         >
+        {selectedImages.length > 0 && (
+          <View style={{ paddingHorizontal: getResponsiveSize(24), marginBottom: getResponsiveSize(8) }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedImages.map((uri, idx) => (
+                <View key={idx} style={styles.imagePreviewContainer}>
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => removeSelectedImage(idx)}>
+                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <Image source={{ uri }} style={{ width: getResponsiveSize(72), height: getResponsiveSize(72) }} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
           <InputContainer
             userResponse={userResponse}
             setUserResponse={setUserResponse}
@@ -375,6 +465,7 @@ export default function Notes() {
             onlyRecording={false}
             placeholder="Work: This is a work note"
             containerStyle={{ marginBottom: 0 }}
+            onAddImagePress={handleAddImagePress}
           />
         </View>
       </View>

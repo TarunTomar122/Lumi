@@ -30,6 +30,7 @@
     "expo-dev-client": "~5.0.20",
     "expo-font": "~13.0.4",
     "expo-haptics": "~14.0.1",
+    "expo-image-picker": "~16.0.6",
     "expo-linking": "~7.0.5",
     "expo-router": "~4.0.20",
     "expo-speech-recognition": "^2.0.0",

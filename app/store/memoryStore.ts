@@ -5,6 +5,7 @@ import type { Memory as DatabaseMemory } from '@/utils/database';
 export interface Memory extends Omit<DatabaseMemory, 'id'> {
   id: number;
   type: 'memory';
+  images?: string[]; 
 }
 
 interface MemoryState {

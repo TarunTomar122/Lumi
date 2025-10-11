@@ -433,10 +433,12 @@ const clientTools = {
     title,
     content,
     tags,
+    images,
   }: {
     title: string;
     content: string;
     tags: string[];
+    images?: string[];
   }) => {
     try {
       const memory = await db.addMemory({
@@ -444,6 +446,7 @@ const clientTools = {
         content,
         date: new Date().toISOString(),
         tags,
+        images: images || [],
       });
       return { success: true, id: memory.id };
     } catch (error) {

@@ -1,4 +1,5 @@
 import SQLite from 'react-native-sqlite-storage';
+import * as FileSystem from 'expo-file-system';
 
 // Enable debugging in development
 SQLite.DEBUG(true);
@@ -22,6 +23,7 @@ export interface Memory {
   content: string;
   date: string;
   tags: string[];
+  images?: string[];
   created_at: string;
 }
 
@@ -130,9 +132,16 @@ class DatabaseManager {
           content TEXT NOT NULL,
           date TEXT NOT NULL,
           tags TEXT NOT NULL,
+          images TEXT,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `);
+      try {
+        await this.database.executeSql(`
+           ALTER TABLE memories ADD COLUMN images TEXT;
+        `);
+      } catch (error) {
+      }
 
       // Drop and recreate habits table with new schema
       await this.database.executeSql(`
@@ -290,6 +299,7 @@ class DatabaseManager {
         memories.push({
           ...item,
           tags: JSON.parse(item.tags),
+          images: item.images ? JSON.parse(item.images) : [],
         });
       }
       return memories;
@@ -305,13 +315,14 @@ class DatabaseManager {
 
     try {
       const [result] = await this.database.executeSql(
-        `INSERT INTO memories (title, content, date, tags)
-         VALUES (?, ?, ?, ?);`,
+        `INSERT INTO memories (title, content, date, tags, images)
+         VALUES (?, ?, ?, ?, ?);`,
         [
           memory.title,
           memory.content,
           memory.date,
           JSON.stringify(memory.tags),
+          JSON.stringify(memory.images || []),
         ]
       );
 
@@ -324,6 +335,7 @@ class DatabaseManager {
       return {
         ...item,
         tags: JSON.parse(item.tags),
+        images: item.images ? JSON.parse(item.images) : [],
       };
     } catch (error) {
       console.error('Error adding memory:', error);
@@ -337,7 +349,7 @@ class DatabaseManager {
 
     const updateFields = Object.keys(updates)
       .map(key => {
-        if (key === 'tags') {
+        if (key === 'tags' || key === 'images') {
           return `${key} = ?`;
         }
         return `${key} = ?`;
@@ -366,6 +378,20 @@ class DatabaseManager {
     if (!this.database) throw new Error('Database not initialized');
 
     try {
+      const [rowRes] = await this.database.executeSql('SELECT * FROM memories WHERE id = ?;', [id]);
+      if (rowRes.rows.length === 0) {
+        throw new Error('Memory not found');
+      }
+      const memory = rowRes.rows.item(0);
+         for (const uri of JSON.parse(memory.images || '[]')) {
+        try {
+          if (uri && uri.startsWith(FileSystem.documentDirectory)) {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          }
+        } catch (e) {
+        }
+      }
+      await this.database.executeSql('DELETE FROM memories WHERE id = ?;', [id]);
       await this.database.executeSql('DELETE FROM memories WHERE id = ?;', [id]);
     } catch (error) {
       console.error('Error deleting memory:', error);
