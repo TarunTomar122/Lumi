@@ -30,6 +30,8 @@ export interface Habit {
   title: string;
   completions: Record<string, boolean>; // Map of ISO date strings to completion status
   color: string;
+  archived?: boolean;
+  position?: number;
   created_at: string;
 }
 
@@ -141,9 +143,28 @@ class DatabaseManager {
           title TEXT NOT NULL,
           completions TEXT NOT NULL,
           color TEXT NOT NULL,
+          archived INTEGER DEFAULT 0,
+          position INTEGER,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `);
+
+      // Add archived and position columns if they don't exist (for existing databases)
+      try {
+        await this.database.executeSql(`
+          ALTER TABLE habits ADD COLUMN archived INTEGER DEFAULT 0
+        `);
+      } catch (error) {
+        // Column already exists, ignore error
+      }
+
+      try {
+        await this.database.executeSql(`
+          ALTER TABLE habits ADD COLUMN position INTEGER
+        `);
+      } catch (error) {
+        // Column already exists, ignore error
+      }
 
       // Create reflections table
       await this.database.executeSql(`
@@ -380,13 +401,14 @@ class DatabaseManager {
 
     try {
       const [results] = await this.database.executeSql(
-        'SELECT * FROM habits ORDER BY id ASC;'
+        'SELECT * FROM habits WHERE archived = 0 OR archived IS NULL ORDER BY COALESCE(position, id) ASC;'
       );
       const habits: Habit[] = [];
       for (let i = 0; i < results.rows.length; i++) {
         const item = results.rows.item(i);
         habits.push({
           ...item,
+          archived: item.archived === 1,
           completions: JSON.parse(item.completions),
         });
       }
@@ -397,18 +419,51 @@ class DatabaseManager {
     }
   }
 
+  async getArchivedHabits(): Promise<Habit[]> {
+    await this.waitForInit();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [results] = await this.database.executeSql(
+        'SELECT * FROM habits WHERE archived = 1 ORDER BY COALESCE(position, id) ASC;'
+      );
+      const habits: Habit[] = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        const item = results.rows.item(i);
+        habits.push({
+          ...item,
+          archived: item.archived === 1,
+          completions: JSON.parse(item.completions),
+        });
+      }
+      return habits;
+    } catch (error) {
+      console.error('Error getting archived habits:', error);
+      throw error;
+    }
+  }
+
   async addHabit(habit: Omit<Habit, 'id' | 'created_at'>): Promise<Habit> {
     await this.waitForInit();
     if (!this.database) throw new Error('Database not initialized');
 
     try {
+      // Get max position to add new habit at the end
+      const [posResult] = await this.database.executeSql(
+        'SELECT MAX(position) as maxPosition FROM habits WHERE archived = 0 OR archived IS NULL;'
+      );
+      const maxPosition = posResult.rows.item(0).maxPosition || 0;
+      const newPosition = maxPosition + 1;
+
       const [result] = await this.database.executeSql(
-        `INSERT INTO habits (title, completions, color)
-         VALUES (?, ?, ?);`,
+        `INSERT INTO habits (title, completions, color, archived, position)
+         VALUES (?, ?, ?, ?, ?);`,
         [
           habit.title,
           JSON.stringify(habit.completions),
           habit.color,
+          habit.archived ? 1 : 0,
+          habit.position !== undefined ? habit.position : newPosition,
         ]
       );
 
@@ -420,6 +475,7 @@ class DatabaseManager {
       const item = createdHabit.rows.item(0);
       return {
         ...item,
+        archived: item.archived === 1,
         completions: JSON.parse(item.completions),
       };
     } catch (error) {
@@ -434,15 +490,21 @@ class DatabaseManager {
 
     const updateFields = Object.keys(updates)
       .map(key => {
-        if (key === 'completions') {
+        if (key === 'completions' || key === 'archived') {
           return `${key} = ?`;
         }
         return `${key} = ?`;
       })
       .join(', ');
-    const values = Object.entries(updates).map(([key, value]) => 
-      key === 'completions' ? JSON.stringify(value) : value
-    );
+    const values = Object.entries(updates).map(([key, value]) => {
+      if (key === 'completions') {
+        return JSON.stringify(value);
+      }
+      if (key === 'archived') {
+        return value ? 1 : 0;
+      }
+      return value;
+    });
 
     try {
       await this.database.executeSql(`UPDATE habits SET ${updateFields} WHERE id = ?;`, [

@@ -94,8 +94,13 @@ Project background_fetch = project(':react-native-background-fetch')
         applicationId 'com.lumi.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 19
-        versionName "1.7"
+        versionCode 21
+        versionName "1.9"
+        
+        // Support for 16 KB page sizes (required by Google Play as of Nov 2025)
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
     }
     signingConfigs {
         debug {

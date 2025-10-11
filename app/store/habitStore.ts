@@ -13,6 +13,7 @@ interface MonthData {
 
 interface HabitState {
   habits: Habit[];
+  archivedHabits: Habit[];
   setHabits: (habits: Habit[]) => void;
   updateHabitProgress: (id: string, date: string) => Promise<void>;
   addHabit: (title: string) => Promise<void>;
@@ -21,20 +22,23 @@ interface HabitState {
   getWeekProgress: (habit: Habit) => boolean[];
   getMonthData: (habit: Habit, year: number, month: number) => MonthData;
   updateHabitColor: (id: string, color: string) => Promise<void>;
+  archiveHabit: (id: string) => Promise<void>;
+  unarchiveHabit: (id: string) => Promise<void>;
+  reorderHabits: (habits: Habit[]) => Promise<void>;
+  refreshArchivedHabits: () => Promise<void>;
 }
 
-// Pastel colors for habits
+// Pastel colors for habits - distinct and visually different
 export const PASTEL_COLORS = [
-  '#FFB3BA', // pastel red
-  '#FFDFBA', // pastel orange
-  '#FFFFBA', // pastel yellow
-  '#BAFFC9', // pastel green
-  '#BAE1FF', // pastel blue
-  '#E0BBE4', // pastel purple
-  '#CDE7BE', // pastel mint
-  '#F1C0E8', // pastel pink-purple
-  '#BDE0FE', // pastel sky
-  '#FDE2E4', // pastel blush
+  '#FF6B6B', // coral red
+  '#FFB84D', // bright orange
+  '#F7DC6F', // golden yellow
+  '#52C41A', // vibrant green
+  '#1890FF', // bright blue
+  '#B37FEB', // purple
+  '#FF85C0', // pink
+  '#36CFC9', // cyan
+  '#FA8C16', // dark orange
 ];
 
 // Get array of ISO date strings for current week (Monday to Sunday)
@@ -58,6 +62,7 @@ const getMonthDates = (year: number, month: number): string[] => {
 
 export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
+  archivedHabits: [],
   
   setHabits: (habits) => set({ habits }),
   
@@ -154,5 +159,52 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       year,
       month
     };
+  },
+
+  archiveHabit: async (id) => {
+    const updateResult = await clientTools.updateHabit({
+      id,
+      archived: true,
+    });
+
+    if (updateResult.success) {
+      set((state) => ({
+        habits: state.habits.filter(h => h.id !== Number(id)),
+      }));
+    }
+  },
+
+  unarchiveHabit: async (id) => {
+    const updateResult = await clientTools.updateHabit({
+      id,
+      archived: false,
+    });
+
+    if (updateResult.success) {
+      await get().refreshHabits();
+      await get().refreshArchivedHabits();
+    }
+  },
+
+  reorderHabits: async (habits) => {
+    // Update positions in the database
+    for (let i = 0; i < habits.length; i++) {
+      if (habits[i].id) {
+        await clientTools.updateHabit({
+          id: habits[i].id.toString(),
+          position: i,
+        });
+      }
+    }
+    
+    // Refresh to get updated order
+    await get().refreshHabits();
+  },
+
+  refreshArchivedHabits: async () => {
+    const result = await clientTools.getArchivedHabits();
+    if (result.success && result.habits) {
+      set({ archivedHabits: result.habits });
+    }
   },
 })); 

@@ -88,6 +88,7 @@ export default function Reflections() {
     if (!userResponse) return;
 
     let date = DateTime.now();
+    // Include the selected prompt if one was chosen
     let content = selectedPrompt ? `prompt: ${selectedPrompt}\n\n${userResponse}` : userResponse;
 
     // First split by colon
@@ -120,9 +121,8 @@ export default function Reflections() {
 
         if (parsedDate?.isValid) {
           date = parsedDate.set({ year: DateTime.now().year });
-          content = selectedPrompt
-            ? `prompt: ${selectedPrompt}\n\n${responseContent}`
-            : responseContent;
+          // Update content with parsed date removed
+          content = selectedPrompt ? `prompt: ${selectedPrompt}\n\n${responseContent}` : responseContent;
         }
       }
     }
@@ -134,7 +134,24 @@ export default function Reflections() {
   };
 
   const handlePromptSelect = (prompt: string) => {
-    setSelectedPrompt(prompt === selectedPrompt ? undefined : prompt);
+    // Toggle prompt selection - don't modify input
+    if (selectedPrompt === prompt) {
+      setSelectedPrompt(undefined);
+    } else {
+      setSelectedPrompt(prompt);
+    }
+  };
+
+  const handleRandomReflection = () => {
+    if (reflections.length === 0) return;
+    
+    // Pick a random reflection
+    const randomIndex = Math.floor(Math.random() * reflections.length);
+    const randomReflection = reflections[randomIndex];
+    
+    if (randomReflection.id) {
+      router.push(`/reflection/${randomReflection.id}`);
+    }
   };
 
   const styles = createThemedStyles(colors => ({
@@ -190,7 +207,6 @@ export default function Reflections() {
     reflectionItem: {
       marginBottom: getResponsiveHeight(16),
       paddingVertical: getResponsiveHeight(6),
-      borderRadius: getResponsiveSize(12),
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
@@ -206,6 +222,9 @@ export default function Reflections() {
       color: colors.textSecondary,
       lineHeight: getResponsiveSize(22),
     },
+    randomButton: {
+      padding: getResponsiveSize(4),
+    },
   }));
 
   return (
@@ -215,6 +234,12 @@ export default function Reflections() {
         <TouchableOpacity onPress={() => router.push('/')} style={styles.backButton}>
           <Ionicons name="arrow-back" size={getResponsiveSize(28)} color={colors.text} />
           <Text style={styles.backText}>Reflections</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={handleRandomReflection} 
+          style={[styles.randomButton, { opacity: reflections.length === 0 ? 0.3 : 1 }]}
+          disabled={reflections.length === 0}>
+          <Ionicons name="shuffle" size={getResponsiveSize(28)} color={colors.text} />
         </TouchableOpacity>
       </View>
       <View style={styles.container}>
