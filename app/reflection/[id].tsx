@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Keyboard,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ const ReflectionDetails = () => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [textContent, setTextContent] = React.useState(reflection?.content || '');
   const [isEditing, setIsEditing] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
   // Parse content to separate prompt and response
   const parseContent = (content: string) => {
@@ -71,11 +73,20 @@ const ReflectionDetails = () => {
     };
   }, []);
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
     if (reflection?.id) {
       await deleteReflection(reflection.id);
+      setShowDeleteConfirm(false);
       router.back();
     }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   const debouncedSave = useCallback(
@@ -154,6 +165,62 @@ const ReflectionDetails = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: getResponsiveSize(12),
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: getResponsiveSize(24),
+    },
+    modalContainer: {
+      width: '100%',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: getResponsiveSize(20),
+    },
+    modalTitle: {
+      fontSize: getResponsiveSize(18),
+      fontFamily: 'MonaSans-Medium',
+      color: colors.text,
+      marginBottom: getResponsiveSize(8),
+    },
+    modalMessage: {
+      fontSize: getResponsiveSize(14),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.textSecondary,
+      marginBottom: getResponsiveSize(16),
+      lineHeight: getResponsiveSize(20),
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: getResponsiveSize(12),
+    },
+    modalButton: {
+      paddingVertical: getResponsiveSize(10),
+      paddingHorizontal: getResponsiveSize(16),
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    modalCancelButton: {
+      backgroundColor: colors.card,
+    },
+    modalDeleteButton: {
+      backgroundColor: colors.error,
+      borderColor: colors.error,
+    },
+    modalButtonText: {
+      fontSize: getResponsiveSize(14),
+      fontFamily: 'MonaSans-Medium',
+    },
+    modalCancelButtonText: {
+      color: colors.text,
+    },
+    modalDeleteButtonText: {
+      color: '#ffffff',
     },
     loader: {
       marginRight: getResponsiveSize(4),
@@ -291,6 +358,31 @@ const ReflectionDetails = () => {
           </Text> */}
         </View>
       )}
+
+      {/* Delete confirmation modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelDelete}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Delete reflection?</Text>
+            <Text style={styles.modalMessage}>
+              This action cannot be undone. Are you sure you want to delete this reflection?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={handleCancelDelete} style={[styles.modalButton, styles.modalCancelButton]}>
+                <Text style={[styles.modalButtonText, styles.modalCancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConfirmDelete} style={[styles.modalButton, styles.modalDeleteButton]}>
+                <Text style={[styles.modalButtonText, styles.modalDeleteButtonText]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

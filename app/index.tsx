@@ -21,6 +21,7 @@ import BackgroundFetch from 'react-native-background-fetch';
 import { DateTime } from 'luxon';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Page() {
   const navigation = useNavigation();
@@ -86,6 +87,14 @@ export default function Page() {
           async taskId => {
             console.log('BackgroundFetch taskId:', taskId);
             try {
+              // Skip if user has disabled reflection reminders
+              const remindersEnabled = await AsyncStorage.getItem('reflectionRemindersEnabled');
+              const isEnabled = remindersEnabled === null ? true : remindersEnabled === 'true';
+              if (!isEnabled) {
+                BackgroundFetch.finish(taskId);
+                return;
+              }
+
               const now = DateTime.now().setZone('Asia/Kolkata');
               const hours = now.hour;
               

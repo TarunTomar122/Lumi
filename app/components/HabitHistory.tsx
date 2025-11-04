@@ -15,6 +15,8 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
   const { colors, createThemedStyles, isDark } = useTheme();
   const updateProgress = useHabitStore(state => state.updateHabitProgress);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [visibleMonth, setVisibleMonth] = useState<number>(DateTime.now().month);
+  const [visibleYear, setVisibleYear] = useState<number>(DateTime.now().year);
 
   // Convert habit completions to marked dates format
   const markedDates = React.useMemo(() => {
@@ -23,23 +25,30 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
     // Add completed dates
     Object.entries(habit.completions).forEach(([date, completed]) => {
       if (completed) {
-        dates[date] = {
-          selected: true,
-          selectedColor: habit.color,
-        };
+        const dt = DateTime.fromISO(date);
+        if (dt.year === visibleYear && dt.month === visibleMonth) {
+          dates[date] = {
+            selected: true,
+            selectedColor: habit.color,
+          };
+        }
       }
     });
 
     // Add selected date highlight if it's different from a completed date
-    if (selectedDate && !dates[selectedDate]?.selected) {
+    if (selectedDate) {
+      const dtSel = DateTime.fromISO(selectedDate);
+      const isInVisibleMonth = dtSel.isValid && dtSel.year === visibleYear && dtSel.month === visibleMonth;
+      if (isInVisibleMonth && !dates[selectedDate]?.selected) {
       dates[selectedDate] = {
         selected: true,
         selectedColor: '#F5A6B9',
       };
+      }
     }
 
     return dates;
-  }, [habit.completions, selectedDate, habit.color]);
+  }, [habit.completions, selectedDate, habit.color, visibleMonth, visibleYear]);
 
   const handleDayPress = async (day: { dateString: string }) => {
     const isCompleted = habit.completions[day.dateString];
@@ -69,10 +78,15 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
   return (
     <View style={styles.container}>
       <Calendar
-        current={DateTime.now().toISODate()}
+        current={DateTime.fromObject({ year: visibleYear, month: visibleMonth, day: 1 }).toISODate() || undefined}
         onDayPress={handleDayPress}
         markedDates={markedDates}
         firstDay={1}
+        onMonthChange={(m) => {
+          setVisibleMonth(m.month);
+          setVisibleYear(m.year);
+        }}
+        disableAllTouchEventsForDisabledDays={true}
         theme={{
           backgroundColor: colors.surface,
           calendarBackground: colors.background,

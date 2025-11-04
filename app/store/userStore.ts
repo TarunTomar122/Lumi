@@ -5,16 +5,19 @@ interface UserState {
   username: string;
   hasCompletedOnboarding: boolean;
   isLoading: boolean;
+  reflectionRemindersEnabled: boolean;
   setUsername: (username: string) => void;
   updateUsername: (username: string) => Promise<void>;
   setOnboardingComplete: (username: string) => Promise<void>;
   initializeUser: () => Promise<void>;
+  setReflectionRemindersEnabled: (enabled: boolean) => Promise<void>;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
   username: '',
   hasCompletedOnboarding: false,
   isLoading: true,
+  reflectionRemindersEnabled: true,
 
   setUsername: (username: string) => {
     set({ username });
@@ -47,15 +50,27 @@ export const useUserStore = create<UserState>((set, get) => ({
     try {
       const hasCompletedOnboarding = await AsyncStorage.getItem('hasCompletedOnboarding');
       const storedUsername = await AsyncStorage.getItem('username');
+      const remindersEnabled = await AsyncStorage.getItem('reflectionRemindersEnabled');
       
       set({
         hasCompletedOnboarding: hasCompletedOnboarding === 'true',
         username: storedUsername || '',
         isLoading: false,
+        reflectionRemindersEnabled: remindersEnabled === null ? true : remindersEnabled === 'true',
       });
     } catch (error) {
       console.error('Error initializing user:', error);
       set({ isLoading: false });
+    }
+  },
+
+  setReflectionRemindersEnabled: async (enabled: boolean) => {
+    try {
+      await AsyncStorage.setItem('reflectionRemindersEnabled', enabled ? 'true' : 'false');
+      set({ reflectionRemindersEnabled: enabled });
+    } catch (error) {
+      console.error('Error updating reflection reminders setting:', error);
+      throw error;
     }
   },
 })); 

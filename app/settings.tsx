@@ -16,13 +16,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useUserStore } from './store/userStore';
+import { ReflectionReminderService } from '@/utils/reflectionReminder';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
-import { downloadLumiModel, getLocalModelStatus, deleteLocalModel } from '../utils/localModel';
+// import { downloadLumiModel, getLocalModelStatus, deleteLocalModel } from '../utils/localModel';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { colors, createThemedStyles, isDark, setTheme } = useTheme();
-  const { username, updateUsername } = useUserStore();
+  const { username, updateUsername, reflectionRemindersEnabled, setReflectionRemindersEnabled } = useUserStore();
   const [newUsername, setNewUsername] = useState(username);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [supportExpanded, setSupportExpanded] = useState(false);
@@ -201,14 +202,14 @@ export default function SettingsPage() {
     },
   }));
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const status = await getLocalModelStatus();
-        setModelHasFile(!!status.hasModel);
-      } catch {}
-    })();
-  }, []);
+  // React.useEffect(() => {
+  //   (async () => {
+  //     try {
+  //       const status = await getLocalModelStatus();
+  //       setModelHasFile(!!status.hasModel);
+  //     } catch {}
+  //   })();
+  // }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -298,6 +299,46 @@ export default function SettingsPage() {
             </View>
           </View>
         </View>
+
+      {/* Reminders Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Reminders</Text>
+        <View style={styles.settingItem}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Ionicons 
+                name="notifications-outline" 
+                size={getResponsiveSize(20)} 
+                color={colors.text} 
+              />
+              <Text style={styles.settingText}>Daily reflection reminders</Text>
+            </View>
+            <Switch
+              value={reflectionRemindersEnabled}
+              onValueChange={async (value) => {
+                try {
+                  await setReflectionRemindersEnabled(value);
+                  if (value) {
+                    // Re-check and schedule if needed
+                    await ReflectionReminderService.checkAndScheduleReminder();
+                  } else {
+                    // Cancel any pending reminders
+                    await ReflectionReminderService.onReflectionAdded();
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to update reminder setting');
+                }
+              }}
+              trackColor={{ 
+                false: isDark ? '#3a3a3a' : colors.border, 
+                true: colors.primary 
+              }}
+              thumbColor='#ffffff'
+              ios_backgroundColor={isDark ? '#3a3a3a' : colors.border}
+            />
+          </View>
+        </View>
+      </View>
 
         {/* Support Section */}
         <View style={styles.section}>

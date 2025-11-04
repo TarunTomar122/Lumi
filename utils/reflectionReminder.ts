@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import { scheduleNotification, checkNotificationPermission, sendInstantNotification } from './tools';
 import notifee from '@notifee/react-native';
 import { clientTools } from './tools';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const REFLECTION_REMINDER_ID = 'daily_reflection_reminder';
 const REFLECTION_REMINDER_TIME = { hour: 21, minute: 0 }; // 9:00 PM
@@ -31,6 +32,16 @@ export class ReflectionReminderService {
    */
   private static async runInBackground(): Promise<void> {
     try {
+      // Respect user preference for reflection reminders (default: enabled)
+      const remindersEnabled = await AsyncStorage.getItem('reflectionRemindersEnabled');
+      const isEnabled = remindersEnabled === null ? true : remindersEnabled === 'true';
+      if (!isEnabled) {
+        // Ensure no pending reminder remains when disabled
+        await this.cancelExistingReminder();
+        console.log('📝 Reflection reminders disabled by user - skipping scheduling');
+        return;
+      }
+
       // Check if user has notification permissions (required for reminders)
       const hasPermission = await checkNotificationPermission();
       if (!hasPermission) {

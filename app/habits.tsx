@@ -111,6 +111,7 @@ export default function Habits() {
   }) => {
     const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     const progress = getWeekProgress(habit);
+    const todayISO = DateTime.now().toISODate();
 
     // Get array of ISO date strings for current week starting from Monday
     const weekDates = React.useMemo(() => {
@@ -123,13 +124,17 @@ export default function Habits() {
       <View style={styles.progressContainer}>
         {days.map((day, index) => (
           <View key={index} style={styles.dayColumn}>
-            <Text style={styles.dayLabel}>{day}</Text>
+            <Text style={[
+              styles.dayLabel,
+              (weekDates[index] === todayISO) && !progress[index] && styles.todayLabel,
+            ]}>{day}</Text>
             <TouchableOpacity
               onPress={() => onDayPress(weekDates[index])}
               style={[
                 styles.circle,
                 progress[index] && { backgroundColor: habit.color, opacity: isDark ? 0.9 : 1 },
                 !progress[index] && { backgroundColor: colors.background }, // Light pink background for non-completed days
+                (weekDates[index] === todayISO) && !progress[index] && styles.todayCircle,
               ]}
             />
           </View>
@@ -374,12 +379,20 @@ export default function Habits() {
       color: colors.textSecondary,
       marginBottom: getResponsiveSize(4),
     },
+    todayLabel: {
+      color: colors.primary,
+      fontFamily: 'MonaSans-SemiBold',
+    },
     circle: {
       width: getResponsiveSize(36),
       height: getResponsiveSize(36),
       borderRadius: getResponsiveSize(20),
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    todayCircle: {
+      borderWidth: 2,
+      borderColor: colors.primary,
     },
     habitHistoryContainer: {
       marginTop: getResponsiveSize(0),
