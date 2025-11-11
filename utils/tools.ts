@@ -5,7 +5,7 @@ import notifee, {
   AndroidColor,
 } from '@notifee/react-native';
 import { db } from '@/utils/database';
-import type { Task, Memory, Habit } from '@/utils/database';
+import type { Task, Memory, Habit, RecurringReminder } from '@/utils/database';
 import { DateTime } from 'luxon';
 import { checkUsagePermission, getLastDayUsageStats } from '@/utils/usageStats';
 import { useHabitStore } from '@/app/store/habitStore';
@@ -22,6 +22,66 @@ const clientToolsSchema = [
     type: 'function',
     name: 'getReminders',
     description: 'Gets all reminders from the local database.',
+  },
+  {
+    type: 'function',
+    name: 'getAllRecurringReminders',
+    description: 'Gets all recurring reminders from the local database.',
+  },
+  {
+    type: 'function',
+    name: 'addRecurringReminder',
+    description: 'Adds a recurring reminder to the local database.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        rule_type: { type: 'string', enum: ['weekly', 'monthly', 'every_n_days'] },
+        interval: { type: 'number' },
+        day_of_week: { type: 'number' },
+        day_of_month: { type: 'number' },
+        time_hour: { type: 'number' },
+        time_minute: { type: 'number' },
+        next_occurrence: { type: 'string' },
+        active: { type: 'boolean' },
+      },
+      required: ['title', 'rule_type', 'time_hour', 'time_minute', 'next_occurrence'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'updateRecurringReminder',
+    description: 'Updates a recurring reminder.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        rule_type: { type: 'string', enum: ['weekly', 'monthly', 'every_n_days'] },
+        interval: { type: 'number' },
+        day_of_week: { type: 'number' },
+        day_of_month: { type: 'number' },
+        time_hour: { type: 'number' },
+        time_minute: { type: 'number' },
+        next_occurrence: { type: 'string' },
+        active: { type: 'boolean' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'deleteRecurringReminder',
+    description: 'Deletes a recurring reminder.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+      },
+      required: ['id'],
+    },
   },
   {
     type: 'function',
@@ -310,6 +370,51 @@ const clientTools = {
     );
     return { success: true, reminders };
   },
+  getAllRecurringReminders: async () => {
+    try {
+      const reminders = await db.getAllRecurringReminders();
+      const now = DateTime.now().setZone('Asia/Kolkata');
+
+      // Ensure next_occurrence is always in the future
+      const updatedReminders = await Promise.all(
+        reminders.map(async (reminder) => {
+          try {
+            if (!reminder.next_occurrence) return reminder;
+            let next = DateTime.fromISO(reminder.next_occurrence).setZone('Asia/Kolkata');
+            if (!next.isValid) return reminder;
+
+            // Advance until in the future with a safety cap
+            let safety = 0;
+            while (next <= now && safety < 24) {
+              if (reminder.rule_type === 'weekly') {
+                next = next.plus({ weeks: 1 });
+              } else if (reminder.rule_type === 'monthly') {
+                next = next.plus({ months: 1 });
+              } else {
+                next = next.plus({ days: Math.max(1, reminder.interval || 1) });
+              }
+              safety++;
+            }
+
+            if (next.toISO() !== reminder.next_occurrence) {
+              await db.updateRecurringReminder(reminder.id!, { next_occurrence: next.toISO() || reminder.next_occurrence });
+              // Schedule next notification
+              await scheduleNotification(reminder.title, reminder.description || null, next);
+              return { ...reminder, next_occurrence: next.toISO() || reminder.next_occurrence };
+            }
+            return reminder;
+          } catch {
+            return reminder;
+          }
+        })
+      );
+
+      return { success: true, reminders: updatedReminders };
+    } catch (error) {
+      console.error('Error fetching recurring reminders:', error);
+      return { success: false, error: 'Failed to fetch recurring reminders.' };
+    }
+  },
   addTask: async (taskData: Omit<Task, 'id'>) => {
     try {
       let notificationId = null;
@@ -348,6 +453,54 @@ const clientTools = {
     } catch (error) {
       console.error('Error adding task:', error);
       return { success: false, error: 'Failed to add task.' };
+    }
+  },
+  addRecurringReminder: async (
+    reminderData: Omit<RecurringReminder, 'id' | 'created_at'>
+  ) => {
+    try {
+      const hasPermission = await requestNotificationPermissionIfNeeded();
+      if (!hasPermission) {
+        return {
+          success: false,
+          error:
+            'Notification permission required for recurring reminders. Please enable notifications in your device settings.',
+        };
+      }
+      // Normalize next occurrence to future
+      let nextDt = DateTime.fromISO(reminderData.next_occurrence).setZone('Asia/Kolkata');
+      if (!nextDt.isValid || nextDt <= DateTime.now().setZone('Asia/Kolkata')) {
+        nextDt = DateTime.now().setZone('Asia/Kolkata').set({
+          hour: reminderData.time_hour,
+          minute: reminderData.time_minute,
+          second: 0,
+          millisecond: 0,
+        });
+        if (nextDt <= DateTime.now().setZone('Asia/Kolkata')) {
+          // bump based on rule
+          if (reminderData.rule_type === 'weekly') {
+            nextDt = nextDt.plus({ weeks: 1 });
+          } else if (reminderData.rule_type === 'monthly') {
+            nextDt = nextDt.plus({ months: 1 });
+          } else {
+            nextDt = nextDt.plus({ days: Math.max(1, reminderData.interval || 1) });
+          }
+        }
+      }
+
+      const created = await db.addRecurringReminder({
+        ...reminderData,
+        next_occurrence: nextDt.toISO() || reminderData.next_occurrence,
+      });
+      await scheduleNotification(
+        created.title,
+        created.description || null,
+        DateTime.fromISO(created.next_occurrence).setZone('Asia/Kolkata')
+      );
+      return { success: true, reminder: created };
+    } catch (error) {
+      console.error('Error adding recurring reminder:', error);
+      return { success: false, error: 'Failed to add recurring reminder.' };
     }
   },
 
@@ -423,6 +576,31 @@ const clientTools = {
     } catch (error) {
       console.error('Error updating task:', error);
       return { success: false, error: 'Failed to update task.' };
+    }
+  },
+  updateRecurringReminder: async ({
+    id,
+    ...updates
+  }: { id: number } & Partial<Omit<RecurringReminder, 'id'>>) => {
+    try {
+      // Cancel existing triggers (coarse but simple)
+      const notificationIds = await notifee.getTriggerNotificationIds();
+      for (const nId of notificationIds) {
+        await notifee.cancelTriggerNotification(nId);
+      }
+      await db.updateRecurringReminder(id, updates);
+      const all = await db.getAllRecurringReminders();
+      const reminder = all.find(r => r.id === id);
+      if (reminder && reminder.active !== false) {
+        const nextDt = DateTime.fromISO(reminder.next_occurrence).setZone('Asia/Kolkata');
+        if (nextDt > DateTime.now().setZone('Asia/Kolkata')) {
+          await scheduleNotification(reminder.title, reminder.description || null, nextDt);
+        }
+      }
+      return { success: true, reminder };
+    } catch (error) {
+      console.error('Error updating recurring reminder:', error);
+      return { success: false, error: 'Failed to update recurring reminder.' };
     }
   },
 
@@ -655,6 +833,19 @@ const clientTools = {
       return { success: false, error: 'Failed to delete reflection.' };
     }
   },
+  deleteRecurringReminder: async ({ id }: { id: number }) => {
+    try {
+      const notificationIds = await notifee.getTriggerNotificationIds();
+      for (const nId of notificationIds) {
+        await notifee.cancelTriggerNotification(nId);
+      }
+      await db.deleteRecurringReminder(id);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting recurring reminder:', error);
+      return { success: false, error: 'Failed to delete recurring reminder.' };
+    }
+  },
 };
 
 export { clientTools, clientToolsSchema };
@@ -797,4 +988,51 @@ export const requestNotificationPermissionIfNeeded = async (): Promise<boolean> 
     console.error('Error requesting notification permission:', error);
     return false;
   }
+};
+
+// Compute next occurrence helper
+export const computeNextOccurrence = (
+  data: Pick<RecurringReminder, 'rule_type' | 'interval' | 'day_of_week' | 'day_of_month' | 'time_hour' | 'time_minute'>,
+  from: DateTime
+): DateTime => {
+  const base = from.set({
+    hour: data.time_hour,
+    minute: data.time_minute,
+    second: 0,
+    millisecond: 0,
+  }).setZone('Asia/Kolkata');
+
+  if (data.rule_type === 'every_n_days') {
+    const interval = Math.max(1, data.interval || 1);
+    return base.plus({ days: interval });
+  }
+
+  if (data.rule_type === 'weekly') {
+    // Luxon weekday: 1=Mon ... 7=Sun
+    const targetWeekday = data.day_of_week && data.day_of_week >= 1 && data.day_of_week <= 7
+      ? data.day_of_week
+      : base.weekday;
+    let candidate = base;
+    const delta = (targetWeekday + 7 - candidate.weekday) % 7;
+    candidate = candidate.plus({ days: delta === 0 ? 7 : delta });
+    return candidate;
+  }
+
+  if (data.rule_type === 'monthly') {
+    const targetDay = data.day_of_month && data.day_of_month >= 1 && data.day_of_month <= 28
+      ? data.day_of_month
+      : Math.min(28, base.day);
+    let candidate = base.plus({ months: 1 }).set({ day: targetDay });
+    if (!candidate.isValid) {
+      candidate = base.plus({ months: 1 }).endOf('month').set({
+        hour: data.time_hour,
+        minute: data.time_minute,
+        second: 0,
+        millisecond: 0,
+      });
+    }
+    return candidate;
+  }
+
+  return base.plus({ days: 1 });
 };

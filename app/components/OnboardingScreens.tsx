@@ -104,7 +104,7 @@ export const OnboardingScreens: React.FC<OnboardingScreensProps> = ({ onComplete
             </View>
 
             <View style={styles.welcomeFooter}>
-              <Text style={styles.footerText}>Let's build better habits together ✨</Text>
+              <Text style={styles.footerText}>Let's build better streaks together ✨</Text>
             </View>
           </View>
         </ScrollView>
@@ -270,7 +270,7 @@ export const OnboardingScreens: React.FC<OnboardingScreensProps> = ({ onComplete
       illustration: <NotesIllustration />,
     },
     {
-      title: 'Visual Habit Tracking',
+      title: 'Visual Streaks',
       description: 'Build streaks and see your progress with beautiful weekly views.',
       backgroundColor: '#ffffff',
       illustration: <HabitsIllustration />,

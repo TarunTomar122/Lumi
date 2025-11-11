@@ -266,6 +266,32 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
       borderColor: colors.border,
       marginHorizontal: getResponsiveSize(1),
     },
+    legendListContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: getResponsiveSize(8),
+      marginTop: getResponsiveSize(12),
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: getResponsiveSize(6),
+      maxWidth: '48%',
+    },
+    legendDot: {
+      width: getResponsiveSize(12),
+      height: getResponsiveSize(12),
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    legendLabel: {
+      fontSize: getResponsiveSize(12),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.text,
+      flexShrink: 1,
+    },
     statsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -357,7 +383,7 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
             size={getResponsiveSize(32)}
             color={colors.textSecondary}
           />
-          <Text style={styles.emptyText}>Select habits to view heatmap</Text>
+          <Text style={styles.emptyText}>Select streaks to view heatmap</Text>
         </View>
       </View>
     );
@@ -466,8 +492,17 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habits, selectedHabi
               <Text style={styles.legendText}>More</Text>
             </View>
           ) : (
-            <View style={styles.legendContainer}>
-              <Text style={styles.legendText}>Each color represents a completed habit</Text>
+            <View style={styles.legendListContainer}>
+              {habits
+                .filter(h => selectedHabits.includes(h.id!))
+                .map(habit => (
+                  <View key={habit.id} style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: habit.color }]} />
+                    <Text style={styles.legendLabel} numberOfLines={1}>
+                      {habit.title}
+                    </Text>
+                  </View>
+                ))}
             </View>
           )}
         </View>

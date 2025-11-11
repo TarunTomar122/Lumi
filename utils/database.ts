@@ -42,6 +42,23 @@ export interface Reflection {
   created_at: string;
 }
 
+export type RecurrenceRuleType = 'weekly' | 'monthly' | 'every_n_days';
+
+export interface RecurringReminder {
+  id?: number;
+  title: string;
+  description?: string | null;
+  rule_type: RecurrenceRuleType;
+  interval?: number | null; // used for every_n_days
+  day_of_week?: number | null; // 1 (Mon) - 7 (Sun)
+  day_of_month?: number | null; // 1 - 31
+  time_hour: number; // 0-23
+  time_minute: number; // 0-59
+  next_occurrence: string; // ISO datetime
+  active?: boolean;
+  created_at: string;
+}
+
 class DatabaseManager {
   private database: SQLite.SQLiteDatabase | null = null;
   private static instance: DatabaseManager;
@@ -179,6 +196,29 @@ class DatabaseManager {
       console.log('Tables created successfully');
     } catch (error) {
       console.error('Error in createTables:', error);
+      throw error;
+    }
+
+    // Recurring reminders table (created outside try/catch above to ensure legacy DBs get updated)
+    try {
+      await this.database.executeSql(`
+        CREATE TABLE IF NOT EXISTS recurring_reminders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          description TEXT,
+          rule_type TEXT NOT NULL,
+          interval INTEGER,
+          day_of_week INTEGER,
+          day_of_month INTEGER,
+          time_hour INTEGER NOT NULL,
+          time_minute INTEGER NOT NULL,
+          next_occurrence TEXT NOT NULL,
+          active INTEGER DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+    } catch (error) {
+      console.error('Error ensuring recurring_reminders table:', error);
       throw error;
     }
   }
@@ -600,6 +640,94 @@ class DatabaseManager {
       await this.database.executeSql('DELETE FROM reflections WHERE id = ?;', [id]);
     } catch (error) {
       console.error('Error deleting reflection:', error);
+      throw error;
+    }
+  }
+
+  // Recurring reminders CRUD operations
+  async getAllRecurringReminders(): Promise<RecurringReminder[]> {
+    await this.waitForInit();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [results] = await this.database.executeSql(
+        `SELECT * FROM recurring_reminders WHERE active = 1 ORDER BY datetime(next_occurrence) ASC;`
+      );
+      const items: RecurringReminder[] = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        items.push(results.rows.item(i));
+      }
+      return items;
+    } catch (error) {
+      console.error('Error getting recurring reminders:', error);
+      throw error;
+    }
+  }
+
+  async addRecurringReminder(reminder: Omit<RecurringReminder, 'id' | 'created_at' | 'active'> & { active?: boolean }): Promise<RecurringReminder> {
+    await this.waitForInit();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql(
+        `INSERT INTO recurring_reminders 
+          (title, description, rule_type, interval, day_of_week, day_of_month, time_hour, time_minute, next_occurrence, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          reminder.title,
+          reminder.description || null,
+          reminder.rule_type,
+          reminder.interval ?? null,
+          reminder.day_of_week ?? null,
+          reminder.day_of_month ?? null,
+          reminder.time_hour,
+          reminder.time_minute,
+          reminder.next_occurrence,
+          reminder.active === false ? 0 : 1,
+        ]
+      );
+
+      const [created] = await this.database.executeSql(
+        'SELECT * FROM recurring_reminders WHERE id = ?;',
+        [result.insertId]
+      );
+      return created.rows.item(0);
+    } catch (error) {
+      console.error('Error adding recurring reminder:', error);
+      throw error;
+    }
+  }
+
+  async updateRecurringReminder(id: number, updates: Partial<Omit<RecurringReminder, 'id'>>): Promise<void> {
+    await this.waitForInit();
+    if (!this.database) throw new Error('Database not initialized');
+
+    const updateFields = Object.keys(updates)
+      .map(key => `${key} = ?`)
+      .join(', ');
+    const values = Object.values(updates).map(v => {
+      if (typeof v === 'boolean') return v ? 1 : 0;
+      return v;
+    });
+
+    try {
+      await this.database.executeSql(`UPDATE recurring_reminders SET ${updateFields} WHERE id = ?;`, [
+        ...values,
+        id,
+      ]);
+    } catch (error) {
+      console.error('Error updating recurring reminder:', error);
+      throw error;
+    }
+  }
+
+  async deleteRecurringReminder(id: number): Promise<void> {
+    await this.waitForInit();
+    if (!this.database) throw new Error('Database not initialized');
+    try {
+      await this.database.executeSql('DELETE FROM recurring_reminders WHERE id = ?;', [id]);
+    } catch (error) {
+      console.error('Error deleting recurring reminder:', error);
       throw error;
     }
   }

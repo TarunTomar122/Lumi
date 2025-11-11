@@ -23,7 +23,7 @@ export default function HabitsAnalysis() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [selectedHabits, setSelectedHabits] = React.useState<number[]>([]);
   const { habits, refreshHabits } = useHabitStore();
-  const [viewMode, setViewMode] = React.useState<'stripes' | 'blend' | 'dots' | 'intensity'>('blend');
+  const [viewMode, setViewMode] = React.useState<'stripes' | 'blend' | 'dots' | 'intensity'>('dots');
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -181,10 +181,10 @@ export default function HabitsAnalysis() {
             {/* View mode selector */}
             <View style={styles.viewModeContainer}>
               {[
-                { key: 'blend', label: 'Blend' },
                 { key: 'dots', label: 'Dots' },
                 { key: 'stripes', label: 'Stripes' },
                 { key: 'intensity', label: 'Intensity' },
+                { key: 'blend', label: 'Blend' },
               ].map((m) => (
                 <TouchableOpacity
                   key={m.key}

@@ -13,7 +13,7 @@ type HomeCardProps = {
 const getSubtitle = (title: string) => {
   if (title === 'Tasks') return 'For your todos and reminders';
   if (title === 'Notes') return 'For your notes and ideas';
-  if (title === 'Habits') return 'For your habits and routines';
+  if (title === 'Habits' || title === 'Streaks') return 'For your streaks and routines';
   if (title === 'Reflections') return 'For your daily reflections';
 };
 

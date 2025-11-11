@@ -282,7 +282,7 @@ export default function Page() {
               </View>
               <View style={styles.row}>
                 <HomeCard
-                  title="Habits"
+                  title="Streaks"
                   icon="bar-chart-outline"
                   onPress={() => {
                     router.push('/habits');

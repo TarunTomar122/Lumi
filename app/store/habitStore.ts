@@ -16,7 +16,7 @@ interface HabitState {
   archivedHabits: Habit[];
   setHabits: (habits: Habit[]) => void;
   updateHabitProgress: (id: string, date: string) => Promise<void>;
-  addHabit: (title: string) => Promise<void>;
+  addHabit: (title: string, color?: string) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   refreshHabits: () => Promise<void>;
   getWeekProgress: (habit: Habit) => boolean[];
@@ -31,13 +31,11 @@ interface HabitState {
 // Pastel colors for habits - distinct and visually different
 export const PASTEL_COLORS = [
   '#FF6B6B', // coral red
-  '#FFB84D', // bright orange
   '#F7DC6F', // golden yellow
   '#52C41A', // vibrant green
   '#1890FF', // bright blue
   '#B37FEB', // purple
   '#FF85C0', // pink
-  '#36CFC9', // cyan
   '#FA8C16', // dark orange
 ];
 
@@ -109,16 +107,16 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     }
   },
 
-  addHabit: async (title) => {
-    const newColor = PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
-    const result = await clientTools.addHabit({ title, color: newColor });
+  addHabit: async (title, color) => {
+    const chosenColor = color || PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
+    const result = await clientTools.addHabit({ title, color: chosenColor });
     
     if (result.success && result.id) {
       const habit: Habit = {
         id: result.id,
         title,
         completions: {},
-        color: newColor,
+        color: chosenColor,
       };
       set((state) => ({
         habits: [...state.habits, habit],

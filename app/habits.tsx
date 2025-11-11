@@ -40,8 +40,6 @@ export default function Habits() {
   const { colors, createThemedStyles, isDark } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
   const [expandedHabitId, setExpandedHabitId] = React.useState<number | null>(null);
-  const [isAddingHabit, setIsAddingHabit] = React.useState(false);
-  const [newHabitTitle, setNewHabitTitle] = React.useState('');
   const [editingHabitId, setEditingHabitId] = React.useState<number | null>(null);
   const [editHabitTitle, setEditHabitTitle] = React.useState('');
   const [colorPickerForHabitId, setColorPickerForHabitId] = React.useState<number | null>(null);
@@ -72,7 +70,7 @@ export default function Habits() {
     try {
       await refreshHabits();
     } catch (error) {
-      console.error('Error refreshing habits:', error);
+      console.error('Error refreshing streaks:', error);
     }
     setRefreshing(false);
   }, []);
@@ -149,27 +147,9 @@ export default function Habits() {
     }
   };
 
-  const handleAddHabit = async () => {
-    if (!newHabitTitle.trim()) return;
-
-    await addHabit(newHabitTitle.trim());
-
-    setNewHabitTitle('');
-    setIsAddingHabit(false);
-    refreshHabits();
-  };
-
-  const handleAddHabitPress = () => {
-    setIsAddingHabit(true);
-    // Scroll to bottom to ensure input is visible
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
   const handleDeleteHabit = async (habitId: number, habitTitle: string) => {
     Alert.alert(
-      'Delete Habit',
+      'Delete Streak',
       `Are you sure you want to delete "${habitTitle}"? This action cannot be undone.`,
       [
         {
@@ -209,7 +189,7 @@ export default function Habits() {
         await refreshHabits();
       }
     } catch (error) {
-      console.error('Error updating habit:', error);
+      console.error('Error updating streak:', error);
     }
 
     setEditingHabitId(null);
@@ -291,7 +271,7 @@ export default function Habits() {
         await refreshHabits();
       }
     } catch (error) {
-      console.error('Error updating habit:', error);
+      console.error('Error updating streak:', error);
     }
 
     setEditInModal(false);
@@ -344,6 +324,7 @@ export default function Habits() {
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: getResponsiveSize(6),
+      backgroundColor: colors.card,
     },
     habitHeader: {
       flexDirection: 'row',
@@ -382,6 +363,7 @@ export default function Habits() {
     todayLabel: {
       color: colors.primary,
       fontFamily: 'MonaSans-SemiBold',
+      opacity: 0.75,
     },
     circle: {
       width: getResponsiveSize(36),
@@ -393,10 +375,10 @@ export default function Habits() {
     todayCircle: {
       borderWidth: 2,
       borderColor: colors.primary,
+      opacity: 0.45,
     },
     habitHistoryContainer: {
       marginTop: getResponsiveSize(0),
-
     },
     addHabitContainer: {
       marginTop: 0,
@@ -662,7 +644,7 @@ export default function Habits() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/')} style={styles.backButton}>
             <Ionicons name="arrow-back" size={getResponsiveSize(28)} color={colors.text} />
-            <Text style={styles.backText}>Habits</Text>
+              <Text style={styles.backText}>Streaks</Text>
           </TouchableOpacity>
           <View style={styles.headerActions}>
             {isReorderMode ? (
@@ -695,8 +677,8 @@ export default function Habits() {
 
           {habits.length === 0 && (
             <View style={styles.noHabitsContainer}>
-              <Text style={styles.noHabitsText}>No habits yet.</Text>
-              <Text style={styles.noHabitsText}>Start by adding a habit.</Text>
+              <Text style={styles.noHabitsText}>No streaks yet.</Text>
+              <Text style={styles.noHabitsText}>Start a new streak.</Text>
             </View>
           )}
 
@@ -734,51 +716,16 @@ export default function Habits() {
             habits.map(habit => (
               <View key={habit.id} style={styles.habitItem}>
                 <TouchableOpacity
-                  onPress={() => habit.id && editingHabitId !== habit.id && toggleExpand(habit.id)}
+                  onPress={() => habit.id && !isReorderMode && router.push(`/habit/${habit.id}`)}
                   style={styles.habitHeader}
-                  disabled={editingHabitId === habit.id}>
+                  disabled={isReorderMode}>
                   <View style={styles.habitHeaderContent}>
-                    {editingHabitId === habit.id ? (
-                      <TextInput
-                        style={styles.editHabitInput}
-                        value={editHabitTitle}
-                        onChangeText={setEditHabitTitle}
-                        onEndEditing={handleSaveEdit}
-                        onSubmitEditing={handleSaveEdit}
-                        autoFocus
-                        returnKeyType="done"
-                        blurOnSubmit={true}
-                        placeholderTextColor={colors.textTertiary}
-                      />
-                    ) : (
-                      <Text style={styles.habitTitle}>{habit.title}</Text>
-                    )}
+                    <Text style={styles.habitTitle}>{habit.title}</Text>
                   </View>
-                  <View style={styles.habitHeaderActions}>
-                    {expandedHabitId === habit.id && editingHabitId !== habit.id && (
-                      <TouchableOpacity 
-                        onPress={() => setSettingsModalHabitId(habit.id || null)} 
-                        style={styles.settingsIcon}>
-                        <Ionicons name="settings-outline" size={getResponsiveSize(24)} color={colors.text} />
-                      </TouchableOpacity>
-                    )}
-                    <Ionicons
-                      name={expandedHabitId === habit.id ? 'chevron-up' : 'chevron-down'}
-                      size={getResponsiveSize(24)}
-                      color={colors.text}
-                    />
-                  </View>
+                  <View style={styles.habitHeaderActions} />
                 </TouchableOpacity>
-                
-                {expandedHabitId === habit.id ? (
-                  <View>
-                    <View style={styles.habitHistoryContainer}>
-                      <HabitHistory habit={habit} onClose={() => toggleExpand(habit.id!)} />
-                    </View>
-                  </View>
-                ) : (
-                  <ProgressCircles habit={habit} onDayPress={date => handleDayPress(habit, date)} />
-                )}
+
+                <ProgressCircles habit={habit} onDayPress={date => handleDayPress(habit, date)} />
               </View>
             ))
           )}
@@ -793,165 +740,21 @@ export default function Habits() {
             </TouchableOpacity>
           )}
 
-          {/* Add Habit Button or Input */}
+          {/* Add Habit Icon at the end */}
           {!isReorderMode && (
-            <View style={[styles.addHabitContainer, isAddingHabit && { opacity: 1 }]}>
-              {isAddingHabit ? (
-                <View style={styles.addHabitInputContainer}>
-                  <TextInput
-                    style={styles.addHabitInput}
-                    value={newHabitTitle}
-                    onChangeText={setNewHabitTitle}
-                    placeholderTextColor={colors.textTertiary}
-                    placeholder="Reading..."
-                    autoFocus
-                    onBlur={() => setIsAddingHabit(false)}
-                    onSubmitEditing={handleAddHabit}
-                    onFocus={() => {
-                      // Ensure input stays visible when focused
-                      setTimeout(() => {
-                        scrollViewRef.current?.scrollToEnd({ animated: true });
-                      }, 100);
-                    }}
-                  />
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.addHabitButton}
-                  onPress={handleAddHabitPress}>
-                  <Ionicons name="add-circle-outline" size={getResponsiveSize(32)} color={colors.text} />
-                </TouchableOpacity>
-              )}
+            <View style={styles.addHabitContainer}>
+              <TouchableOpacity
+                style={styles.addHabitButton}
+                onPress={() => router.push('/habits/new')}>
+                <Ionicons name="add-circle-outline" size={getResponsiveSize(32)} color={colors.text} />
+              </TouchableOpacity>
             </View>
           )}
+
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Settings Modal */}
-      <Modal
-        visible={settingsModalHabitId !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setSettingsModalHabitId(null);
-          setEditInModal(false);
-          setColorPickerForHabitId(null);
-        }}>
-        <TouchableWithoutFeedback onPress={() => {
-          setSettingsModalHabitId(null);
-          setEditInModal(false);
-          setColorPickerForHabitId(null);
-        }}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{habits.find(h => h.id === settingsModalHabitId)?.title}</Text>
-                  <TouchableOpacity onPress={() => {
-                    setSettingsModalHabitId(null);
-                    setEditInModal(false);
-                    setColorPickerForHabitId(null);
-                  }}>
-                    <Ionicons name="close" size={getResponsiveSize(24)} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-                
-                {!editInModal ? (
-                  <TouchableOpacity
-                    style={styles.modalOption}
-                    onPress={() => {
-                      const habit = habits.find(h => h.id === settingsModalHabitId);
-                      if (habit) {
-                        setModalEditTitle(habit.title);
-                        setEditInModal(true);
-                      }
-                    }}>
-                    <Ionicons name="create-outline" size={getResponsiveSize(20)} color={colors.text} />
-                    <Text style={styles.modalOptionText}>Edit</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View>
-                    <TextInput
-                      style={styles.modalEditInput}
-                      value={modalEditTitle}
-                      onChangeText={setModalEditTitle}
-                      autoFocus
-                      returnKeyType="done"
-                      onSubmitEditing={handleSaveModalEdit}
-                      placeholderTextColor={colors.textTertiary}
-                      placeholder="Habit name..."
-                    />
-                    <View style={styles.modalEditActions}>
-                      <TouchableOpacity
-                        style={[styles.modalEditButton, styles.modalEditButtonCancel]}
-                        onPress={() => setEditInModal(false)}>
-                        <Text style={[styles.modalEditButtonText, styles.modalEditButtonTextCancel]}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.modalEditButton, styles.modalEditButtonSave]}
-                        onPress={handleSaveModalEdit}>
-                        <Text style={[styles.modalEditButtonText, styles.modalEditButtonTextSave]}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => setColorPickerForHabitId(settingsModalHabitId)}>
-                  <Ionicons name="color-palette-outline" size={getResponsiveSize(20)} color={colors.text} />
-                  <Text style={styles.modalOptionText}>Choose Color</Text>
-                </TouchableOpacity>
-
-                {colorPickerForHabitId === settingsModalHabitId && (
-                  <View style={[styles.colorPickerContainer, { paddingHorizontal: getResponsiveSize(24) }]}>
-                    {PASTEL_COLORS.map((c) => (
-                      <TouchableOpacity
-                        key={c}
-                        onPress={async () => {
-                          if (!settingsModalHabitId) return;
-                          await updateHabitColor(settingsModalHabitId.toString(), c);
-                          setColorPickerForHabitId(null);
-                          setSettingsModalHabitId(null);
-                        }}
-                        style={[
-                          styles.colorSwatch,
-                          { backgroundColor: c },
-                          habits.find(h => h.id === settingsModalHabitId)?.color === c && styles.selectedSwatch,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => {
-                    if (settingsModalHabitId) {
-                      handleArchiveHabit(settingsModalHabitId);
-                    }
-                  }}>
-                  <Ionicons name="archive-outline" size={getResponsiveSize(20)} color={colors.text} />
-                  <Text style={styles.modalOptionText}>Archive</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => {
-                    const habit = habits.find(h => h.id === settingsModalHabitId);
-                    if (habit && settingsModalHabitId) {
-                      setSettingsModalHabitId(null);
-                      handleDeleteHabit(settingsModalHabitId, habit.title);
-                    }
-                  }}>
-                  <Ionicons name="trash-outline" size={getResponsiveSize(20)} color={colors.error || '#FF6B6B'} />
-                  <Text style={[styles.modalOptionText, styles.modalOptionDanger]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* Settings moved to dedicated detail page */}
 
       {/* Archived Habits Modal */}
       <Modal

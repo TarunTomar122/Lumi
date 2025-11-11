@@ -33,7 +33,7 @@ export interface ThemeColors {
 }
 
 const lightTheme: ThemeColors = {
-  background: '#fafafa',
+  background: '#f5f5f5',
   surface: '#ffffff',
   card: '#ffffff',
   text: '#000000',
@@ -44,14 +44,14 @@ const lightTheme: ThemeColors = {
   primary: '#000000',
   primaryText: '#ffffff',
   statusBarStyle: 'dark-content',
-  statusBarBackground: '#fafafa',
+  statusBarBackground: '#f5f5f5',
   error: 'rgba(255, 68, 68, 0.8)',
 };
 
 const darkTheme: ThemeColors = {
-  background: '#252525',
+  background: '#181a20',
   surface: '#2e2e2e',
-  card: '#383838',
+  card: '#1f222a',
   text: '#f5f5f5',
   textSecondary: '#c0c0c0',
   textTertiary: '#a0a0a0',
@@ -60,7 +60,7 @@ const darkTheme: ThemeColors = {
   primary: '#f5f5f5',
   primaryText: '#1a1a1a',
   statusBarStyle: 'light-content',
-  statusBarBackground: '#252525',
+  statusBarBackground: '#181a20',
   error: 'rgba(255, 68, 68, 0.8)',
 };
 

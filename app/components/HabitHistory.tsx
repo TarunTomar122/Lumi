@@ -89,7 +89,7 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
         disableAllTouchEventsForDisabledDays={true}
         theme={{
           backgroundColor: colors.surface,
-          calendarBackground: colors.background,
+          calendarBackground: colors.card,
           textSectionTitleColor: colors.textSecondary,
           selectedDayBackgroundColor: habit.color,
           selectedDayBackgroundStyle: {

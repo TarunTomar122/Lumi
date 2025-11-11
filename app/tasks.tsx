@@ -22,7 +22,7 @@ import { useTaskStore } from './store/taskStore';
 import { formatDate } from '@/utils/commons';
 import { DateTime } from 'luxon';
 import { clientTools } from '@/utils/tools';
-import { parseTaskInput } from '@/utils/taskParser';
+import { parseTaskInput, parseRecurringInput } from '@/utils/taskParser';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -34,6 +34,7 @@ import Animated, {
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
 import InputContainer from './components/inputContainer';
+import { useRecurringStore } from './store/recurringStore';
 
 const SwipeableTaskItem = ({
   task,
@@ -305,6 +306,157 @@ const SwipeableTaskItem = ({
   );
 };
 
+const RecurringSwipeableItem = ({
+  reminder,
+  checked,
+  onToggle,
+  onDelete,
+}: {
+  reminder: any;
+  checked: boolean;
+  onToggle: (id: number) => void | Promise<void>;
+  onDelete: (id: number) => void | Promise<void>;
+}) => {
+  const { colors } = useTheme();
+  const translateX = useSharedValue(0);
+  const itemHeight = useSharedValue(0);
+  const itemOpacity = useSharedValue(1);
+  const screenWidth = Dimensions.get('window').width;
+
+  const DELETE_THRESHOLD = 0.3;
+  const REVEAL_THRESHOLD = 0.15;
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .onChange(event => {
+      if (event.translationX > 0) {
+        translateX.value = event.translationX;
+      }
+    })
+    .onFinalize(event => {
+      const swipeDistance = Math.abs(event.translationX);
+      const deleteThreshold = screenWidth * DELETE_THRESHOLD;
+      const revealThreshold = screenWidth * REVEAL_THRESHOLD;
+
+      if (swipeDistance > deleteThreshold) {
+        translateX.value = withTiming(screenWidth, { duration: 300 });
+        itemHeight.value = withTiming(0, { duration: 300 });
+        itemOpacity.value = withTiming(0, { duration: 300 }, () => {
+          runOnJS(onDelete)(reminder.id);
+        });
+      } else if (swipeDistance > revealThreshold) {
+        translateX.value = withSpring(screenWidth * REVEAL_THRESHOLD);
+      } else {
+        translateX.value = withSpring(0);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const containerStyle = useAnimatedStyle(() => ({
+    height: itemHeight.value || 'auto',
+    opacity: itemOpacity.value,
+  }));
+
+  const deleteButtonStyle = useAnimatedStyle(() => ({
+    opacity: translateX.value > screenWidth * REVEAL_THRESHOLD * 0.5 ? 1 : 0,
+  }));
+
+  const itemStyles = StyleSheet.create({
+    swipeContainer: {
+      position: 'relative',
+      marginBottom: getResponsiveSize(12),
+    },
+    deleteBackground: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: colors.divider,
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+    },
+    deleteButtonTouchable: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      width: '100%',
+      paddingLeft: getResponsiveSize(24),
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingVertical: getResponsiveSize(12),
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: getResponsiveSize(12),
+      marginBottom: getResponsiveSize(12),
+      backgroundColor: colors.background,
+    },
+    content: {
+      flex: 1,
+    },
+    title: {
+      fontSize: getResponsiveSize(20),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.text,
+      marginBottom: getResponsiveSize(4),
+    },
+    date: {
+      fontSize: getResponsiveSize(14),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.textSecondary,
+    },
+    checkbox: {
+      width: getResponsiveSize(28),
+      height: getResponsiveSize(28),
+      borderRadius: getResponsiveSize(4),
+      borderWidth: 1,
+      borderColor: colors.text,
+      marginTop: getResponsiveSize(4),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+  });
+
+  return (
+    <Animated.View style={containerStyle}>
+      <View style={itemStyles.swipeContainer}>
+        <Animated.View style={[itemStyles.deleteBackground, deleteButtonStyle]}>
+          <TouchableOpacity style={itemStyles.deleteButtonTouchable} onPress={() => onDelete(reminder.id)}>
+            <Ionicons name="trash-outline" size={getResponsiveSize(24)} color={colors.text} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        <GestureDetector gesture={pan}>
+          <Animated.View style={[itemStyles.itemRow, animatedStyle]}>
+            <View style={itemStyles.content}>
+              <Text style={itemStyles.title}>{reminder.title}</Text>
+              <Text style={itemStyles.date}>Next reminder: {formatDate(reminder.next_occurrence)}</Text>
+            </View>
+            <TouchableOpacity
+              style={[itemStyles.checkbox, checked ? { backgroundColor: colors.text } : null]}
+              onPress={() => onToggle(reminder.id)}
+            >
+              {checked && (
+                <Ionicons
+                  name="checkmark"
+                  size={getResponsiveSize(20)}
+                  color={colors.primaryText}
+                />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        </GestureDetector>
+      </View>
+    </Animated.View>
+  );
+};
+
 export default function Tasks() {
   const router = useRouter();
   const { colors, createThemedStyles } = useTheme();
@@ -314,6 +466,16 @@ export default function Tasks() {
   const [refreshing, setRefreshing] = React.useState(false);
   const { tasks, updateTask, refreshTasks, deleteTask, addTask, error, clearError } =
     useTaskStore();
+  const {
+    reminders: recurringReminders,
+    refreshReminders,
+    addRecurring,
+    updateRecurring,
+    deleteRecurring,
+    skipNext,
+    error: recurringError,
+    clearError: clearRecurringError,
+  } = useRecurringStore();
   const [activeContent, setActiveContent] = React.useState<string>('home');
   const [showDemo, setShowDemo] = React.useState(false);
   const [demoCount, setDemoCount] = React.useState(0);
@@ -322,9 +484,11 @@ export default function Tasks() {
   const [editingTaskId, setEditingTaskId] = React.useState<number | null>(null);
   const [keyboardOffset, setKeyboardOffset] = React.useState(0);
   const [inputBarHeight, setInputBarHeight] = React.useState(0);
+  const [recurringSkipState, setRecurringSkipState] = React.useState<Record<number, { checked: boolean; originalNext: string }>>({});
 
   React.useEffect(() => {
     refreshTasks();
+    refreshReminders();
     loadDemoCount();
   }, []);
 
@@ -442,16 +606,24 @@ export default function Tasks() {
     if (!userResponse.trim()) return; // Don't create task if no input
 
     try {
-      // Parse the user input using the utility function
-      const taskData = parseTaskInput(userResponse);
-
-      // Save the task using the store method
-      const result = await addTask(taskData);
-      if (result.success) {
-        await refreshTasks();
-        setShouldRegroup(true); // Trigger regrouping when new task is added
-        // Clear the input
-        setUserResponse('');
+      // Try recurring first
+      const recurringData = parseRecurringInput(userResponse);
+      if (recurringData) {
+        const res = await addRecurring(recurringData);
+        if (res.success) {
+          await refreshReminders();
+          setUserResponse('');
+        }
+      } else {
+        // Parse the user input using the utility function
+        const taskData = parseTaskInput(userResponse);
+        // Save the task using the store method
+        const result = await addTask(taskData);
+        if (result.success) {
+          await refreshTasks();
+          setShouldRegroup(true); // Trigger regrouping when new task is added
+          setUserResponse('');
+        }
       }
       // Error handling is done by the store and will be shown in UI
     } catch (error) {
@@ -668,6 +840,43 @@ export default function Tasks() {
       fontSize: getResponsiveSize(12),
       fontFamily: 'MonaSans-Medium',
     },
+    recurringItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: getResponsiveSize(12),
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: getResponsiveSize(12),
+    },
+    recurringContent: {
+      flex: 1,
+    },
+    recurringTitle: {
+      fontSize: getResponsiveSize(20),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.text,
+      marginBottom: getResponsiveSize(4),
+    },
+    recurringDate: {
+      fontSize: getResponsiveSize(14),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.textSecondary,
+    },
+    recurringActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: getResponsiveSize(12),
+    },
+    skipCheckbox: {
+      width: getResponsiveSize(28),
+      height: getResponsiveSize(28),
+      borderRadius: getResponsiveSize(4),
+      borderWidth: 1,
+      borderColor: colors.text,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     emptyStateTitle: {
       fontSize: getResponsiveSize(20),
       fontFamily: 'MonaSans-Medium',
@@ -751,6 +960,14 @@ export default function Tasks() {
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>{error}</Text>
                   <TouchableOpacity style={styles.errorButton} onPress={() => clearError()}>
+                    <Text style={styles.errorButtonText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {recurringError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{recurringError}</Text>
+                  <TouchableOpacity style={styles.errorButton} onPress={() => clearRecurringError()}>
                     <Text style={styles.errorButtonText}>Dismiss</Text>
                   </TouchableOpacity>
                 </View>
@@ -845,7 +1062,7 @@ export default function Tasks() {
                     return dateA.toMillis() - dateB.toMillis();
                   });
 
-                  return sortedSections.map((sectionKey, sectionIndex) => (
+                  const sections = sortedSections.map((sectionKey, sectionIndex) => (
                     <View key={sectionKey}>
                       {groupedTasks[sectionKey].length > 0 && (
                         <>
@@ -882,6 +1099,57 @@ export default function Tasks() {
                       )}
                     </View>
                   ));
+
+                  // Append Recurring section at the bottom
+                  if (recurringReminders.length > 0) {
+                    sections.push(
+                      <View key="recurring-section">
+                        <Text style={styles.sectionHeader}>Recurring</Text>
+                        {recurringReminders.map(rem => (
+                          <RecurringSwipeableItem
+                            key={rem.id}
+                            reminder={rem}
+                            checked={!!(rem.id !== undefined && recurringSkipState[rem.id!]?.checked)}
+                            onToggle={async id => {
+                              if (id === undefined) return;
+                              const current = recurringSkipState[id];
+                              if (!current || !current.checked) {
+                                // First time check: record original and skip once
+                                const originalNext = rem.next_occurrence;
+                                setRecurringSkipState(prev => ({
+                                  ...prev,
+                                  [id]: { checked: true, originalNext },
+                                }));
+                                await skipNext(id);
+                                await refreshReminders();
+                              } else {
+                                // Uncheck: revert to original next occurrence
+                                const originalNext = current.originalNext;
+                                await updateRecurring(id, { next_occurrence: originalNext });
+                                await refreshReminders();
+                                setRecurringSkipState(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[id];
+                                  return copy;
+                                });
+                              }
+                            }}
+                            onDelete={async id => {
+                              await deleteRecurring(id);
+                              await refreshReminders();
+                              setRecurringSkipState(prev => {
+                                const copy = { ...prev };
+                                delete copy[id];
+                                return copy;
+                              });
+                            }}
+                          />
+                        ))}
+                      </View>
+                    );
+                  }
+
+                  return sections;
                 })()}
                </ScrollView>
 
