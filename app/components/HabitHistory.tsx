@@ -9,14 +9,35 @@ import { useTheme } from '@/hooks/useTheme';
 interface HabitHistoryProps {
   habit: Habit;
   onClose: () => void;
+  onMonthChange?: (month: number, year: number) => void;
+  initialMonth?: number;
+  initialYear?: number;
 }
 
-export const HabitHistory: React.FC<HabitHistoryProps> = ({ habit }) => {
+export const HabitHistory: React.FC<HabitHistoryProps> = ({ 
+  habit, 
+  onMonthChange, 
+  initialMonth, 
+  initialYear 
+}) => {
   const { colors, createThemedStyles, isDark } = useTheme();
   const updateProgress = useHabitStore(state => state.updateHabitProgress);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [visibleMonth, setVisibleMonth] = useState<number>(DateTime.now().month);
-  const [visibleYear, setVisibleYear] = useState<number>(DateTime.now().year);
+  const [visibleMonth, setVisibleMonth] = useState<number>(initialMonth ?? DateTime.now().month);
+  const [visibleYear, setVisibleYear] = useState<number>(initialYear ?? DateTime.now().year);
+
+  // Sync with parent's initial month/year when they change
+  React.useEffect(() => {
+    if (initialMonth !== undefined && initialYear !== undefined) {
+      setVisibleMonth(initialMonth);
+      setVisibleYear(initialYear);
+    }
+  }, [initialMonth, initialYear]);
+
+  // Notify parent when visible month changes (including initial mount)
+  React.useEffect(() => {
+    onMonthChange?.(visibleMonth, visibleYear);
+  }, [visibleMonth, visibleYear, onMonthChange]);
 
   // Convert habit completions to marked dates format
   const markedDates = React.useMemo(() => {

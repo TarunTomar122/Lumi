@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from './store/habitStore';
 import { getResponsiveSize, getResponsiveHeight } from '../utils/responsive';
 import { useTheme } from '@/hooks/useTheme';
-import { DateTime } from 'luxon';
 import { HabitHeatmap } from './components/HabitHeatmap';
 
 export default function HabitsAnalysis() {

@@ -80,6 +80,8 @@ export function parseTaskInput(userInput: string): ParsedTaskData {
 
 /**
  * Parses user input for recurring reminder patterns like:
+ * - "meds every night at 9pm"
+ * - "workout every day at 6am"
  * - "every monday at 7pm call mom"
  * - "clean house every week"
  * - "pay bills every month on the 5th at 9am"
@@ -116,7 +118,27 @@ export function parseRecurringInput(userInput: string): ParsedRecurringData | nu
   // Remove joining words like "every", "on", "at" from edges
   title = title.replace(/\b(every|on|at)\b/gi, ' ').replace(/\s+/g, ' ').trim();
 
-  // Detect every N days
+  // Detect "every day", "every night", "everyday", "everynight"
+  const isDailyPattern = /\bevery\s*(day|night)\b|\beveryday\b|\beverynight\b/i.test(lower);
+  if (isDailyPattern) {
+    const interval = 1;
+    const start = (anchorDate || now).set({ hour, minute, second: 0, millisecond: 0 });
+    const next = start <= now ? start.plus({ days: interval }) : start;
+    return {
+      title,
+      description: null,
+      rule_type: 'every_n_days',
+      interval,
+      day_of_week: null,
+      day_of_month: null,
+      time_hour: hour,
+      time_minute: minute,
+      next_occurrence: next.toISO() || now.toISO(),
+      active: true,
+    };
+  }
+
+  // Detect every N days (with a number)
   const everyNDays = lower.match(/every\s+(\d+)\s*day(s)?/i);
   if (everyNDays) {
     const interval = Math.max(1, parseInt(everyNDays[1], 10));

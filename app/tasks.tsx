@@ -492,6 +492,36 @@ export default function Tasks() {
     loadDemoCount();
   }, []);
 
+  // Clear skip state for recurring reminders whose next occurrence has arrived
+  React.useEffect(() => {
+    const today = DateTime.now().setZone('Asia/Kolkata').startOf('day');
+    const updatedSkipState = { ...recurringSkipState };
+    let hasChanges = false;
+
+    // Check each reminder that has skip state
+    Object.keys(updatedSkipState).forEach(idStr => {
+      const id = parseInt(idStr);
+      const reminder = recurringReminders.find(r => r.id === id);
+      
+      if (reminder && updatedSkipState[id]?.checked) {
+        const nextOccurrence = DateTime.fromISO(reminder.next_occurrence)
+          .setZone('Asia/Kolkata')
+          .startOf('day');
+        
+        // If the next occurrence is today or in the past, clear the skip state
+        // This means the reminder is due again and should show as unchecked
+        if (nextOccurrence <= today) {
+          delete updatedSkipState[id];
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      setRecurringSkipState(updatedSkipState);
+    }
+  }, [recurringReminders]);
+
   // Group and sort tasks when needed
   React.useEffect(() => {
     if (shouldRegroup) {
@@ -972,7 +1002,7 @@ export default function Tasks() {
                   </TouchableOpacity>
                 </View>
               )}
-              {tasks.length === 0 && (
+              {(tasks.length === 0) && (recurringReminders.length === 0) && (
                 <View style={styles.noTasksContainer}>
                   <View style={styles.emptyStateCard}>
                     <Text style={styles.emptyStateTitle}>Lumi can understand natural language</Text>
@@ -1103,8 +1133,8 @@ export default function Tasks() {
                   // Append Recurring section at the bottom
                   if (recurringReminders.length > 0) {
                     sections.push(
-                      <View key="recurring-section">
-                        <Text style={styles.sectionHeader}>Recurring</Text>
+                      <View key="recurring-section" style={tasks.length === 0 ? styles.taskList : null}>
+                        <Text style={[styles.sectionHeader, tasks.length === 0 ? styles.firstSectionHeader : null]}>Recurring</Text>
                         {recurringReminders.map(rem => (
                           <RecurringSwipeableItem
                             key={rem.id}

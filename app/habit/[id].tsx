@@ -18,9 +18,9 @@ import { getResponsiveHeight, getResponsiveSize } from '@/utils/responsive';
 import { HabitHistory } from '@/app/components/HabitHistory';
 import { clientTools } from '@/utils/tools';
 import { DateTime } from 'luxon';
-import ViewShot, { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import Share from 'react-native-share';
+
+import ViewShot from 'react-native-view-shot';
 
 export default function HabitDetail() {
   const router = useRouter();
@@ -31,11 +31,17 @@ export default function HabitDetail() {
     useHabitStore();
 
   const habit = habits.find(h => h.id === habitId) as Habit | undefined;
+  
+  // Early return MUST be after all hooks but before conditional hooks
+  // to avoid "Rendered fewer hooks than expected" error
   const [title, setTitle] = React.useState(habit?.title || '');
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [selectedColor, setSelectedColor] = React.useState<string>(
     habit?.color || PASTEL_COLORS[0]
   );
+  // Track the currently visible month in the calendar
+  const [visibleMonth, setVisibleMonth] = React.useState<number>(DateTime.now().month);
+  const [visibleYear, setVisibleYear] = React.useState<number>(DateTime.now().year);
 
   React.useEffect(() => {
     refreshHabits();
@@ -165,9 +171,6 @@ export default function HabitDetail() {
       justifyContent: 'space-between',
       marginBottom: getResponsiveSize(8),
     },
-    shareButton: {
-      padding: getResponsiveSize(6),
-    },
     colorGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -183,7 +186,7 @@ export default function HabitDetail() {
       marginBottom: getResponsiveSize(10),
     },
     colorSelected: {
-      borderWidth: 4,
+      borderWidth: 2,
       borderColor: colors.text,
     },
     actionRow: {
@@ -213,56 +216,112 @@ export default function HabitDetail() {
     actionDangerText: {
       color: colors.error || '#FF6B6B',
     },
+    shareImageContainer: {
+      backgroundColor: colors.background,
+      padding: getResponsiveSize(16),
+    },
+    shareImageHeader: {
+      marginBottom: getResponsiveSize(16),
+      alignItems: 'center',
+    },
+    shareImageTitle: {
+      fontSize: getResponsiveSize(24),
+      fontFamily: 'MonaSans-Bold',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    shareImageSubtitle: {
+      fontSize: getResponsiveSize(14),
+      fontFamily: 'MonaSans-Regular',
+      color: colors.textSecondary,
+      marginTop: getResponsiveSize(4),
+      textAlign: 'center',
+    },
+    hiddenViewShot: {
+      position: 'absolute',
+      left: -9999,
+      opacity: 0,
+    },
   }));
 
-  if (!habit) {
-    return null;
-  }
-
-  const completions = habit.completions || {};
+  // Don't early return here to avoid hook violation - handle in render instead
+  const completions = habit?.completions || {};
   const today = DateTime.now().toISODate() || '';
 
-  const getCurrentStreak = (): number => {
-    let streak = 0;
-    let day = DateTime.now();
-    // cap at 365 for performance
-    for (let i = 0; i < 365; i++) {
+  const getLongestStreakInMonth = (): number => {
+    const visibleDate = DateTime.fromObject({ year: visibleYear, month: visibleMonth });
+    const startOfMonth = visibleDate.startOf('month');
+    const endOfMonth = visibleDate.endOf('month');
+    
+    let longestStreak = 0;
+    let currentStreak = 0;
+    
+    // Iterate through each day in the visible month
+    let day = startOfMonth;
+    while (day <= endOfMonth) {
       const key = day.toISODate() || '';
       if (completions[key]) {
-        streak++;
-        day = day.minus({ days: 1 });
+        currentStreak++;
+        longestStreak = Math.max(longestStreak, currentStreak);
       } else {
-        break;
+        currentStreak = 0;
       }
+      day = day.plus({ days: 1 });
     }
-    return streak;
+    
+    return longestStreak;
   };
 
   const getTotals = () => {
-    // Month-to-date completion rate
+    // Calculate stats for the visible month
+    const visibleDate = DateTime.fromObject({ year: visibleYear, month: visibleMonth });
+    const startOfMonth = visibleDate.startOf('month');
+    const endOfMonth = visibleDate.endOf('month');
     const now = DateTime.now();
-    const startOfMonth = now.startOf('month');
+    
+    // If viewing current month, only count up to today
+    // If viewing past month, count entire month
+    // If viewing future month, show 0
+    const isCurrentMonth = visibleYear === now.year && visibleMonth === now.month;
+    const isPastMonth = visibleDate < now.startOf('month');
+    const isFutureMonth = visibleDate > now.endOf('month');
+    
+    const endDate = isCurrentMonth ? now : endOfMonth;
 
-    // Count completed days in current month up to today (inclusive)
+    // Count completed days in visible month
     const completedDays = Object.entries(completions).reduce((count, [date, done]) => {
       if (!done) return count;
       const dt = DateTime.fromISO(date);
       if (!dt.isValid) return count;
-      if (dt >= startOfMonth && dt <= now) return count + 1;
+      if (dt >= startOfMonth && dt <= endDate) return count + 1;
       return count;
     }, 0);
 
-    // Days so far in this month (inclusive of today)
-    const totalDays = Math.max(1, Math.floor(now.diff(startOfMonth, 'days').days || 0) + 1);
-    const completionRate = Math.min(100, Math.round((completedDays / totalDays) * 100));
-    return { completedDays, totalDays, completionRate };
+    // Days to consider for completion rate
+    const totalDays = isFutureMonth 
+      ? 1 // Avoid division by zero
+      : Math.max(1, Math.floor(endDate.diff(startOfMonth, 'days').days || 0) + 1);
+    
+    const completionRate = isFutureMonth 
+      ? 0 
+      : Math.min(100, Math.round((completedDays / totalDays) * 100));
+    
+    // Total days in the visible month
+    const totalDaysInMonth = visibleDate.daysInMonth || 30;
+    
+    return { completedDays, totalDays, completionRate, totalDaysInMonth, isCurrentMonth, isPastMonth };
   };
 
-  const { completedDays, completionRate } = getTotals();
+  const { completedDays, completionRate, totalDaysInMonth, isCurrentMonth } = getTotals();
+  
+  const handleMonthChange = React.useCallback((month: number, year: number) => {
+    setVisibleMonth(month);
+    setVisibleYear(year);
+  }, []);
 
   const saveTitle = async () => {
     try {
-      if (habit.id && title.trim() && title.trim() !== habit.title) {
+      if (habit?.id && title.trim() && title.trim() !== habit.title) {
         await clientTools.updateHabit({ id: habit.id.toString(), title: title.trim() });
         await refreshHabits();
       }
@@ -279,34 +338,6 @@ export default function HabitDetail() {
   };
 
   const calendarShotRef = React.useRef<ViewShot>(null);
-
-  const handleShareCalendar = async () => {
-    try {
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        Alert.alert('Sharing not available', 'Your device does not support sharing.');
-        return;
-      }
-      const uri = await calendarShotRef.current?.capture?.({
-        format: 'png',
-        quality: 1,
-      });
-      if (!uri) return;
-      // Ensure file exists at a stable path
-      const targetPath = FileSystem.cacheDirectory + `habit_calendar_${habit.id}.png`;
-      if (!uri.startsWith(FileSystem.cacheDirectory)) {
-        const data = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        await FileSystem.writeAsStringAsync(targetPath, data, { encoding: FileSystem.EncodingType.Base64 });
-      }
-      await Sharing.shareAsync(uri.startsWith(FileSystem.cacheDirectory) ? uri : targetPath, {
-        dialogTitle: `Share ${habit.title} - Monthly Stats`,
-        mimeType: 'image/png',
-      });
-    } catch (e) {
-      console.log('Error sharing calendar', e);
-      Alert.alert('Error', 'Could not share the calendar image.');
-    }
-  };
 
   const handleArchiveToggle = async () => {
     if (!habit.id) return;
@@ -336,6 +367,49 @@ export default function HabitDetail() {
       ]
     );
   };
+
+  const captureCalendar = async (): Promise<string | null> => {
+    try {
+      if (calendarShotRef.current) {
+        // Delay to ensure the hidden calendar has fully rendered with the correct month
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const uri = await calendarShotRef.current.capture();
+        return uri;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error capturing calendar:', error);
+      Alert.alert('Error', 'Failed to capture calendar image');
+      return null;
+    }
+  };
+
+  const handleShareCalendar = async () => {
+    try {
+      const uri = await captureCalendar();
+      if (!uri) return;
+
+      const monthName = DateTime.fromObject({ year: visibleYear, month: visibleMonth }).toFormat('MMMM yyyy');
+      const timeframe = isCurrentMonth ? 'this month so far' : `in ${monthName}`;
+
+      await Share.open({
+        url: uri,
+        message: `My ${habit.title} progress - ${completionRate}% completion rate ${timeframe}!`,
+        title: 'Share Habit Progress',
+      });
+    } catch (error: any) {
+      console.error('Error sharing calendar:', error);
+      // User cancelled the share dialog, don't show error
+      if (error?.message !== 'User did not share') {
+        console.error('Error sharing calendar:', error);
+      }
+    }
+  };
+
+  // Handle case where habit doesn't exist (e.g., after archiving/deleting)
+  if (!habit) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -388,8 +462,8 @@ export default function HabitDetail() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{getCurrentStreak()} days</Text>
-            <Text style={styles.statLabel}>Current streak</Text>
+            <Text style={styles.statValue}>{getLongestStreakInMonth()} days</Text>
+            <Text style={styles.statLabel}>Longest streak</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{completionRate}%</Text>
@@ -399,15 +473,41 @@ export default function HabitDetail() {
 
         <View style={[styles.card, { marginTop: getResponsiveSize(16) }]}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Monthly Stats</Text>
-            <TouchableOpacity onPress={handleShareCalendar} style={styles.shareButton}>
-              <Ionicons name="share-social-outline" size={getResponsiveSize(20)} color={colors.text} />
+            <Text style={styles.sectionTitle}>
+              {isCurrentMonth 
+                ? 'Monthly Stats' 
+                : `Stats - ${DateTime.fromObject({ year: visibleYear, month: visibleMonth }).toFormat('MMMM yyyy')}`
+              }
+            </Text>
+            <TouchableOpacity onPress={handleShareCalendar} style={styles.iconButton}>
+              <Ionicons name="arrow-redo-outline" size={getResponsiveSize(24)} color={colors.text} />
             </TouchableOpacity>
           </View>
-          <ViewShot ref={calendarShotRef} options={{ format: 'png', quality: 1 }}>
-            <HabitHistory habit={habit} onClose={() => {}} />
-          </ViewShot>
+          <HabitHistory habit={habit} onClose={() => {}} onMonthChange={handleMonthChange} />
         </View>
+
+        {/* Hidden ViewShot for sharing - includes header */}
+        <ViewShot 
+          ref={calendarShotRef} 
+          options={{ format: 'png', quality: 1 }} 
+          style={styles.hiddenViewShot}
+          key={`${visibleYear}-${visibleMonth}`}
+        >
+          <View style={styles.shareImageContainer}>
+            <View style={styles.shareImageHeader}>
+              <Text style={styles.shareImageTitle}>{habit.title}</Text>
+              <Text style={styles.shareImageSubtitle}>
+                {DateTime.fromObject({ year: visibleYear, month: visibleMonth }).toFormat('MMMM yyyy')} • {completedDays}/{totalDaysInMonth} days completed
+              </Text>
+            </View>
+            <HabitHistory 
+              habit={habit} 
+              onClose={() => {}} 
+              initialMonth={visibleMonth}
+              initialYear={visibleYear}
+            />
+          </View>
+        </ViewShot>
 
         <View style={[styles.card, { marginTop: getResponsiveSize(16) }]}>
           <Text style={styles.sectionTitle}>Color</Text>

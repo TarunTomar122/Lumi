@@ -142,16 +142,9 @@ export default function Reflections() {
     }
   };
 
-  const handleRandomReflection = () => {
+  const handleReflectionWall = () => {
     if (reflections.length === 0) return;
-    
-    // Pick a random reflection
-    const randomIndex = Math.floor(Math.random() * reflections.length);
-    const randomReflection = reflections[randomIndex];
-    
-    if (randomReflection.id) {
-      router.push(`/reflection/${randomReflection.id}`);
-    }
+    router.push('/reflection-wall');
   };
 
   const styles = createThemedStyles(colors => ({
@@ -236,10 +229,10 @@ export default function Reflections() {
           <Text style={styles.backText}>Reflections</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          onPress={handleRandomReflection} 
+          onPress={handleReflectionWall} 
           style={[styles.randomButton, { opacity: reflections.length === 0 ? 0.3 : 1 }]}
           disabled={reflections.length === 0}>
-          <Ionicons name="shuffle" size={getResponsiveSize(28)} color={colors.text} />
+          <Ionicons name="grid-outline" size={getResponsiveSize(28)} color={colors.text} />
         </TouchableOpacity>
       </View>
       <View style={styles.container}>
